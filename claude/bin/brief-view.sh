@@ -94,7 +94,7 @@ footer() {
     local u=updates; [ "$sk" -eq 1 ] && u=update
     printf '\033[2m— generated %s · %s %s skipped%s\033[0m' "$AGE" "$sk" "$u" "$more"
   else
-    printf '\033[2m— generated %s · live%s\033[0m' "$AGE" "$more"
+    printf '\033[2m— generated %s%s\033[0m' "$AGE" "$more"
   fi
 }
 
