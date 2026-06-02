@@ -65,6 +65,38 @@ render() {
   fi
 }
 
+# Relative-age bucket -> sets $AGE (pure arithmetic, no fork). Coarse buckets, so
+# the footer only changes at 15/30/45s, 1/2/5/10/20/30m, 1/2/3/5/10h.
+agebucket() {
+  local a=$1
+  if   [ "$a" -lt 15 ];    then AGE="just now"
+  elif [ "$a" -lt 30 ];    then AGE="15s ago"
+  elif [ "$a" -lt 45 ];    then AGE="30s ago"
+  elif [ "$a" -lt 60 ];    then AGE="45s ago"
+  elif [ "$a" -lt 120 ];   then AGE="1m ago"
+  elif [ "$a" -lt 300 ];   then AGE="2m ago"
+  elif [ "$a" -lt 600 ];   then AGE="5m ago"
+  elif [ "$a" -lt 1200 ];  then AGE="10m ago"
+  elif [ "$a" -lt 1800 ];  then AGE="20m ago"
+  elif [ "$a" -lt 3600 ];  then AGE="30m ago"
+  elif [ "$a" -lt 7200 ];  then AGE="1h ago"
+  elif [ "$a" -lt 10800 ]; then AGE="2h ago"
+  elif [ "$a" -lt 18000 ]; then AGE="3h ago"
+  elif [ "$a" -lt 36000 ]; then AGE="5h ago"
+  else                          AGE="10h+ ago"
+  fi
+}
+
+# Print the footer line (no leading newline) from $AGE, $sk, $more.
+footer() {
+  if [ "$sk" -gt 0 ]; then
+    local u=updates; [ "$sk" -eq 1 ] && u=update
+    printf '\033[2m— generated %s · %s %s skipped%s\033[0m' "$AGE" "$sk" "$u" "$more"
+  else
+    printf '\033[2m— generated %s · live%s\033[0m' "$AGE" "$more"
+  fi
+}
+
 printf '\033]0;brief %s\007' "${sid:0:8}"    # name the pane
 cols=""; rows=""
 while :; do
@@ -89,16 +121,21 @@ while :; do
       total=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
       printf '%s\n' "$out" | head -n "$maxrows"
       over=$(( total - maxrows )); [ "$over" -lt 0 ] && over=0
-      gen=$(stat -f '%Sm' -t '%H:%M:%S' "$brief" 2>/dev/null)
-      sk=$(cat "$skipf" 2>/dev/null); case "$sk" in ''|*[!0-9]*) sk=0 ;; esac
       more=""; [ "$over" -gt 0 ] && more=" · +${over} below"
-      if [ "$sk" -gt 0 ]; then
-        u=updates; [ "$sk" -eq 1 ] && u=update
-        printf '\n\033[2m— %s %s skipped since generated %s%s\033[0m' "$sk" "$u" "${gen:-?}" "$more"
-      else
-        printf '\n\033[2m— generated %s · live%s\033[0m' "${gen:-?}" "$more"
-      fi
+      sk=$(cat "$skipf" 2>/dev/null); case "$sk" in ''|*[!0-9]*) sk=0 ;; esac
+      gen_epoch=$(stat -f %m "$brief" 2>/dev/null); [ -n "$gen_epoch" ] || gen_epoch=$EPOCHSECONDS
+      footer_row=$(( (total < maxrows ? total : maxrows) + 1 ))   # content rows + the blank line
+      agebucket $(( EPOCHSECONDS - gen_epoch )); last_age="$AGE"
+      printf '\n'; footer
       : > "$marker"                            # mark "rendered as of now" (builtin, no fork)
+    elif [ -n "$gen_epoch" ]; then
+      # No content change — just tick the relative age if its bucket rolled over,
+      # reprinting ONLY the footer line (cursor-positioned). No glow, no forks.
+      agebucket $(( EPOCHSECONDS - gen_epoch ))
+      if [ "$AGE" != "$last_age" ]; then
+        tput cup "$footer_row" 0 2>/dev/null; footer; tput el 2>/dev/null
+        last_age="$AGE"
+      fi
     fi
   elif [ "$redraw" = 1 ]; then
     { tput clear 2>/dev/null || printf '\033[H\033[2J'; }
