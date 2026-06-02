@@ -1,15 +1,12 @@
 # claude-context — live session-brief dock for Claude Code + iTerm2
 
 A per-session, auto-refreshing **brief** docked beside your Claude Code session in
-iTerm2, plus a fleet overview across all sessions — so you can tab between many
-concurrent sessions and instantly re-orient.
+iTerm2 — so you can tab between many concurrent sessions and instantly re-orient.
 
 ## Commands
 - **`/brief`** — open/refocus a docked iTerm2 split showing this session's live
   brief (State · Tried · Gotchas · Decisions · Next). `/brief float` = separate
   window; `/brief refresh` = regenerate the brief now instead of next turn.
-- **`/sessions`** — one line per recent session (age · goal · current task), the
-  one you're in marked `▸`, to decide which tab to jump to.
 
 ## How it works
 - A **`Stop`** hook runs a cheap Haiku summary each completed turn (cost-gated:
@@ -24,8 +21,8 @@ concurrent sessions and instantly re-orient.
 ## Files (mirror of the live `~/.claude` layout)
 ```
 claude/hooks/      task-prompt-hook.sh task-summary-hook.sh task-summary-worker.sh session-end-hook.sh
-claude/bin/        induct-open.sh induct-view.sh induct-prune.sh sessions-list.sh
-claude/commands/   brief.md sessions.md
+claude/bin/        induct-open.sh induct-view.sh induct-prune.sh
+claude/commands/   brief.md
 claude/glow-induct.json
 iterm2/DynamicProfiles/induct.json     (Default profile + 1.2x line spacing)
 ```
