@@ -121,20 +121,21 @@ repaint_footer() {
 
 # Print the footer line. Normally a dim "— generated <age> …" line; while a
 # refresh is in flight ($spinframe set) it LEADS with the animated spinner in
-# amber (undimmed, non-bold) so it's obvious, with the dim status trailing. Builds the
-# body with printf -v (no subshell) since this can repaint every tick.
+# amber (undimmed, non-bold) so it's obvious, and the age reads "previously
+# generated <age>" since the shown content is the prior gen. Builds the body with
+# printf -v (no subshell) since this can repaint every tick.
 footer() {
   local body u=updates
   [ "$sk" -eq 1 ] && u=update
   if [ "$sk" -gt 0 ]; then
-    printf -v body 'generated %s · %s %s skipped%s%s' "$AGE" "$sk" "$u" "$more" "$rtail"
+    printf -v body '%s · %s %s skipped%s%s' "$AGE" "$sk" "$u" "$more" "$rtail"
   else
-    printf -v body 'generated %s%s%s' "$AGE" "$more" "$rtail"
+    printf -v body '%s%s%s' "$AGE" "$more" "$rtail"
   fi
   if [ -n "$spinframe" ]; then
-    printf '\033[33m%s updating…\033[0m\033[2m · %s\033[0m' "$spinframe" "$body"
+    printf '\033[33m%s updating…\033[0m\033[2m · previously generated %s\033[0m' "$spinframe" "$body"
   else
-    printf '\033[2m— %s\033[0m' "$body"
+    printf '\033[2m— generated %s\033[0m' "$body"
   fi
 }
 
