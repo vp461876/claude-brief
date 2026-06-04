@@ -28,5 +28,6 @@ OSA
 fi
 
 rm -f "$st/$sid.brief.session" "$st/$sid.brief.pid" "$st/$sid.brief.seen" \
-      "$st/$sid.brief.done" "$st/$sid.brief.noauto"
+      "$st/$sid.brief.done" "$st/$sid.brief.noauto" "$st/$sid.brief.size"
+rmdir "$st/$sid.brief.lock" 2>/dev/null   # release a stray summariser lock, if any
 exit 0

@@ -16,6 +16,7 @@ pidf="$state_dir/$sid.brief.pid"
 marker="$state_dir/$sid.brief.seen"   # mtime bumped after each render -> fork-free change detect
 skipf="$state_dir/$sid.skipped"        # trivial-turn skip counter (written by the Stop hook)
 donef="$state_dir/$sid.brief.done"     # outcome word the worker writes at the end of each attempt: updated/unchanged/timeout/error
+sizef="$state_dir/$sid.brief.size"     # viewer publishes "rows cols" here so the summariser can size the brief to the pane
 echo $$ > "$pidf"
 
 cleanup() { tput rmcup 2>/dev/null; tput cnorm 2>/dev/null; rm -f "$pidf" "$marker"; exit 0; }
@@ -170,7 +171,6 @@ done
 intv_int=${LADDER[intv_idx]}; intv_label=$(fmt_int "$intv_int")
 refreshing=0; refresh_start=0; rtail_until=0
 SPIN=('|' '/' '-' '\'); spin=0; spinframe=""; last_spin=""   # in-flight spinner (rotating bar): leads the footer, animated while refreshing
-scroll=0; scrolled=0   # vertical scroll into a brief taller than the pane (j/k/space/b/g/G); scrolled=1 forces a re-render next tick
 done_mt=$(stat -f %m "$donef" 2>/dev/null || echo 0)   # last-seen done-stamp mtime (outcome watcher)
 REFRESH_TIMEOUT=95   # viewer backstop for a stuck refresh (the worker's own 90s watchdog + margin)
 MSG_SECS=4           # how long a transient footer message lingers before reverting to the hint
@@ -196,7 +196,6 @@ set_hint; rtail="$HINT"; last_rtail=""
 # "simplify" it to `date`.
 while :; do
   redraw=0
-  [ "$scrolled" = 1 ] && { redraw=1; scrolled=0; }   # a scroll key requested a re-render
   # Poll the LIVE pane size every tick. stty does a direct TIOCGWINSZ ioctl, so it
   # sees resizes immediately and ignores any stale COLUMNS env that makes tput lie.
   # tput is the fallback if stty gave nothing. Reflows on a real W/H change.
@@ -210,24 +209,25 @@ while :; do
   if [ -z "$c" ] || [ -z "$r" ]; then
     if [ -z "$cols" ]; then c=80; r=40; else c=$cols; r=$rows; fi
   fi
-  if [ "$c" != "$cols" ] || [ "$r" != "$rows" ]; then cols="$c"; rows="$r"; redraw=1; fi
+  if [ "$c" != "$cols" ] || [ "$r" != "$rows" ]; then
+    cols="$c"; rows="$r"; redraw=1
+    printf '%s %s\n' "$rows" "$cols" > "$sizef"   # publish pane size for the summariser to fit the next brief to
+  fi
   if [ -f "$brief" ]; then
     [[ "$brief" -nt "$marker" ]] && redraw=1   # brief CONTENT changed -> full re-render (fork-free -nt)
     # NOTE: a .skipped change is handled as a footer-only reprint below — it must
     # NOT force a full md re-render (that caused a spurious second redraw per turn).
     if [ "$redraw" = 1 ]; then
-      # Full wipe, then render the visible WINDOW [$scroll .. +maxrows]. Default
-      # scroll=0 keeps the TOP (title/state) visible; j/k/space/b/g/G scroll a
-      # brief taller than the pane. clear() adds no scrollback on the alt screen.
+      # Full wipe, then render CLIPPED to the pane height: keeps the TOP (title/
+      # state) visible. The summariser sizes the brief to the pane (see $sizef), so
+      # overflow is rare — "+N below" is just a backstop. No scrollback on alt screen.
       maxrows=$(( rows - 2 )); [ "$maxrows" -lt 3 ] && maxrows=3
       { tput clear 2>/dev/null || printf '\033[H\033[2J'; }
       out=$(render 2>/dev/null)
       total=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
-      maxscroll=$(( total - maxrows )); [ "$maxscroll" -lt 0 ] && maxscroll=0
-      [ "$scroll" -gt "$maxscroll" ] && scroll=$maxscroll; [ "$scroll" -lt 0 ] && scroll=0
-      printf '%s\n' "$out" | tail -n "+$(( scroll + 1 ))" | head -n "$maxrows"
-      more=""; [ "$scroll" -gt 0 ] && more=" · ↑${scroll}"
-      below=$(( total - scroll - maxrows )); [ "$below" -gt 0 ] && more="${more} · ↓${below}"
+      printf '%s\n' "$out" | head -n "$maxrows"
+      over=$(( total - maxrows )); [ "$over" -lt 0 ] && over=0
+      more=""; [ "$over" -gt 0 ] && more=" · +${over} below"
       sk=$(cat "$skipf" 2>/dev/null); case "$sk" in ''|*[!0-9]*) sk=0 ;; esac
       gen_epoch=$(stat -f %m "$brief" 2>/dev/null); [ -n "$gen_epoch" ] || gen_epoch=$EPOCHSECONDS
       footer_row=$(( (total < maxrows ? total : maxrows) + 1 ))   # content rows + the blank line
@@ -285,8 +285,8 @@ while :; do
   fi
   # Idle pacing AND input in one wait: 0.5s normally, 0.2s while a refresh is in
   # flight so the spinner animates at ~5 frames/s (it advances one frame per tick).
-  # r refresh · a auto · i interval · +/- period · j/k/space/b/g/G scroll · ? help
-  # · q quit. Fractional -t needs bash 4+ (already required: $EPOCHSECONDS is 5+).
+  # r refresh · a auto · i interval · +/- period · ? help · q quit. Fractional -t
+  # needs bash 4+ (already required here: $EPOCHSECONDS is bash 5+).
   poll=0.5; [ "$refreshing" = 1 ] && poll=0.2
   read -rsn1 -t "$poll" key || key=""
   case "$key" in
@@ -314,14 +314,8 @@ while :; do
       ;;
     '+'|'=') step_interval 1 ;;    # raise the interval period ('=' is the unshifted '+' key)
     '-'|'_') step_interval -1 ;;   # lower the interval period
-    j|J) scroll=$(( scroll + 1 ));           scrolled=1 ;;   # scroll a brief taller than the pane: line down
-    k|K) scroll=$(( scroll - 1 ));           scrolled=1 ;;   # line up
-    ' ') scroll=$(( scroll + maxrows - 1 )); scrolled=1 ;;   # page down (1-line overlap)
-    b|B) scroll=$(( scroll - maxrows + 1 )); scrolled=1 ;;   # page up
-    g)   scroll=0;                           scrolled=1 ;;   # top
-    G)   scroll=999999;                      scrolled=1 ;;   # bottom (clamped on redraw)
     '?')       # transient key cheatsheet
-      rtail=' · r refresh · a auto · i interval · ± period · j/k/space scroll · q quit'; rtail_until=$(( EPOCHSECONDS + HELP_SECS )); repaint_footer
+      rtail=' · r refresh · a auto · i interval · ± period · q quit'; rtail_until=$(( EPOCHSECONDS + HELP_SECS )); repaint_footer
       ;;
     q|Q) exit 0 ;;
   esac

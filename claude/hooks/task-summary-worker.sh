@@ -65,6 +65,18 @@ if [ -f "$tpath" ]; then
 fi
 hist=$(printf '%s' "$hist" | tail -c 5000)
 
+# Size the brief to the dock pane: the viewer publishes "rows cols" to $sizef.
+# Default to a roomy 42x80 (≈ the old "40 lines") when the dock isn't open / the
+# size is unknown. $avail = rendered lines the brief should fit within.
+rows=42; cols=80
+sizef="$state_dir/$sid.brief.size"
+if [ -f "$sizef" ]; then
+  read -r sr sc _ < "$sizef" 2>/dev/null
+  case "$sr" in ''|*[!0-9]*) ;; *) rows=$sr ;; esac
+  case "$sc" in ''|*[!0-9]*) ;; *) cols=$sc ;; esac
+fi
+avail=$(( rows - 2 )); [ "$avail" -lt 6 ] && avail=6
+
 sys='You maintain the live state of a coding session. Output TWO parts.
 
 PART 1 — a 2-line status label. Output EXACTLY two lines, lowercase keys, no markdown, no quotes, no trailing punctuation:
@@ -74,7 +86,7 @@ Be concrete — name files, tools, or components. Prefer specifics over generic 
 
 Then a line containing ONLY: ===BRIEF===
 
-PART 2 — a living session brief in GitHub markdown that re-briefs a developer who just tabbed back in. UPDATE the previous brief (given below) with what changed this turn; do NOT regenerate from scratch. Preserve durable knowledge; drop resolved or stale items from State and Next. Be concrete: name files, errors, commands, line numbers. Keep it tight: at most 40 lines, terse bullets. Use EXACTLY these sections, in order, each always present (use a single "—" when a section is empty):
+PART 2 — a living session brief in GitHub markdown that re-briefs a developer who just tabbed back in. UPDATE the previous brief (given below) with what changed this turn; do NOT regenerate from scratch. Preserve durable knowledge; drop resolved or stale items from State and Next. Be concrete: name files, errors, commands, line numbers. Keep it tight and terse; FIT the display budget given in the user message — shorten or drop the least-important bullets first so the whole brief fits the pane. Use EXACTLY these sections, in order, each always present (use a single "—" when a section is empty):
 # <one-line goal>
 ## State
 ## Tried
@@ -83,7 +95,9 @@ PART 2 — a living session brief in GitHub markdown that re-briefs a developer 
 ## Next / Open
 If nothing material changed since the previous brief, output ONLY the word UNCHANGED after the marker.'
 
-usr="Session title hint: ${title:-none}
+usr="Display budget: this brief renders in a terminal pane about ${rows} rows tall and ${cols} cols wide. Keep the WHOLE rendered brief within ~${avail} lines (count the blank line between sections and any wrapping of lines past ~${cols} chars). Be terser on a small pane — fewer, shorter bullets, drop the least-important first; use the extra room on a tall one.
+
+Session title hint: ${title:-none}
 
 Previous brief (update this; <none> means this is the first turn):
 ${prevbrief:-<none>}
