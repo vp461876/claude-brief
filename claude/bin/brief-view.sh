@@ -197,12 +197,19 @@ set_hint; rtail="$HINT"; last_rtail=""
 while :; do
   redraw=0
   [ "$scrolled" = 1 ] && { redraw=1; scrolled=0; }   # a scroll key requested a re-render
-  # Poll the LIVE pane size every tick. stty does a direct TIOCGWINSZ ioctl, so
-  # it sees resizes immediately and ignores any stale COLUMNS env that makes
-  # tput lie. tput is the fallback if stdin isn't the tty. Reflows on W or H change.
+  # Poll the LIVE pane size every tick. stty does a direct TIOCGWINSZ ioctl, so it
+  # sees resizes immediately and ignores any stale COLUMNS env that makes tput lie.
+  # tput is the fallback if stty gave nothing. Reflows on a real W/H change.
   sz=$(stty size 2>/dev/null); r=${sz%% *}; c=${sz##* }
-  [ "$c" -gt 0 ] 2>/dev/null || c=$(tput cols 2>/dev/null || echo 80)
-  [ "$r" -gt 0 ] 2>/dev/null || r=$(tput lines 2>/dev/null || echo 40)
+  case "$c" in ''|*[!0-9]*) c=$(tput cols  2>/dev/null) ;; esac
+  case "$r" in ''|*[!0-9]*) r=$(tput lines 2>/dev/null) ;; esac
+  case "$c" in ''|*[!0-9]*) c= ;; esac; case "$r" in ''|*[!0-9]*) r= ;; esac
+  # If we couldn't read a VALID size this tick (transient stty/tput failure), keep
+  # the cached size — never redraw on a bad read (that caused spurious resize
+  # redraws). 80x40 only at bootstrap, when there's no cached size yet.
+  if [ -z "$c" ] || [ -z "$r" ]; then
+    if [ -z "$cols" ]; then c=80; r=40; else c=$cols; r=$rows; fi
+  fi
   if [ "$c" != "$cols" ] || [ "$r" != "$rows" ]; then cols="$c"; rows="$r"; redraw=1; fi
   if [ -f "$brief" ]; then
     [[ "$brief" -nt "$marker" ]] && redraw=1   # brief CONTENT changed -> full re-render (fork-free -nt)
