@@ -13,7 +13,9 @@ iTerm2 — so you can tab between many concurrent sessions and instantly re-orie
   skips trivial turns) → `~/.claude/state/<sid>.brief.md` + `.task`. The model
   call is **pluggable** — `task-summary-worker.sh` delegates to
   `bin/brief-summarize.sh` (default Haiku `claude -p`); point `$BRIEF_SUMMARIZER`
-  at your own script (contract documented in that file) to use another model.
+  at your own script **under `~/.claude/`** (e.g. `~/.claude/bin/`) to use another
+  model. It's executed, so it's only honoured from that trusted dir and must be a
+  user-owned, non-world-writable executable (contract documented in that file).
 - A **`UserPromptSubmit`** hook maps pane/cwd → session id so `/brief` resolves
   which session it's in.
 - The viewer renders the brief with `glow` + a perl post-processor (gutter, indent

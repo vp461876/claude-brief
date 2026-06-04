@@ -4,7 +4,10 @@
 # $BRIEF_SUMMARIZER points to) under a watchdog, so the MODEL IS PLUGGABLE.
 #
 # CONTRACT (write your own and point $BRIEF_SUMMARIZER at it — e.g. an OpenAI,
-# Ollama, or different-Claude-model backend):
+# Ollama, or different-Claude-model backend). For security it's only honoured if
+# it lives UNDER ~/.claude/ (e.g. ~/.claude/bin/), with no '..', and is an
+# executable, user-owned, non-world-writable file — else the worker uses this
+# default. Interface:
 #   in:   $BRIEF_SYS   system prompt
 #         $BRIEF_USR   user prompt
 #   out:  the raw response on STDOUT — two lines "goal: …" / "now: …", then a

@@ -84,19 +84,21 @@ $prompt
 
 Produce PART 1, then the ===BRIEF=== marker line, then PART 2."
 
-# Resolve the summariser. $BRIEF_SUMMARIZER swaps the model, but it's EXECUTED,
-# so only honour it if it's an ABSOLUTE path to a regular, user-owned, non-world-
-# writable executable — else fall back to the shipped default. It runs as you
-# (like $EDITOR); this guards against an override you didn't set yourself — e.g. a
-# relative path resolved in an untrusted repo's CWD, or a world-writable/other-
-# owned script. (A user-owned script *inside* an untrusted repo still passes;
-# restrict the path further or rely on project-trust if that matters to you.)
+# Resolve the summariser. $BRIEF_SUMMARIZER swaps the model, but it's EXECUTED, so
+# only honour it if it lives UNDER ~/.claude/ (a dir untrusted repos can't write
+# to), has no '..' escape, and is a regular, user-owned, non-world-writable
+# executable — else fall back to the shipped default. It runs as you (like
+# $EDITOR); the ~/.claude/ confinement + ownership/perm checks mean an override
+# you didn't set yourself (e.g. injected by an untrusted repo's project env, or a
+# relative / in-repo script) is ignored. Put a custom summariser in ~/.claude/bin/.
 summariser="$HOME/.claude/bin/brief-summarize.sh"
 if [ -n "$BRIEF_SUMMARIZER" ]; then
   perm=$(stat -f %Lp "$BRIEF_SUMMARIZER" 2>/dev/null || echo 777)
   case "$BRIEF_SUMMARIZER" in
-    /*) [ -f "$BRIEF_SUMMARIZER" ] && [ -x "$BRIEF_SUMMARIZER" ] && [ -O "$BRIEF_SUMMARIZER" ] \
-          && ! (( 8#$perm & 0002 )) && summariser="$BRIEF_SUMMARIZER" ;;
+    *..*) ;;                                            # reject path-traversal escapes
+    "$HOME"/.claude/*)
+      [ -f "$BRIEF_SUMMARIZER" ] && [ -x "$BRIEF_SUMMARIZER" ] && [ -O "$BRIEF_SUMMARIZER" ] \
+        && ! (( 8#$perm & 0002 )) && summariser="$BRIEF_SUMMARIZER" ;;
   esac
 fi
 # Prompts go via env ($BRIEF_SYS/$BRIEF_USR); CLAUDE_TASK_SUMMARY guards recursion
