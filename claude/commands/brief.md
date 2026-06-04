@@ -9,8 +9,9 @@ re-focused just now. Click the dock pane to use its keys: `r` refresh now ·
 `a` toggle **auto** (refresh at the end of each turn — the default; turn off for
 on-demand only) · `i` toggle **interval** (refresh periodically during a long
 turn; only fires on new activity, so idle never spends) · `+`/`-` set the
-interval period (30s–1h) · `?` key help · `q` close. The footer shows both
-modes. `/brief refresh` does a one-shot refresh from here but re-splits the pane.
+interval period (30s–1h) · `j`/`k`/space scroll a brief taller than the pane ·
+`?` key help · `q` close. The footer shows both modes. `/brief refresh` does a
+one-shot refresh from here but re-splits the pane.
 
 !`~/.claude/bin/brief-open.sh $ARGUMENTS`
 
