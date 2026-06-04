@@ -90,14 +90,22 @@ agebucket() {
 }
 
 # On-demand refresh: spawn the same Haiku summarizer the Stop hook uses,
-# detached, for THIS session. Resolves the transcript path the way brief-open.sh
-# does. Returns non-zero (doing nothing) if no transcript exists yet.
+# detached, for THIS session. Uses the cached transcript path ($tp, resolved at
+# startup the way brief-open.sh does; re-resolved here if it went missing).
+# Returns non-zero (doing nothing) if no transcript exists yet.
 do_refresh() {
-  local tp
-  tp=$(ls -t "$HOME"/.claude/projects/*/"$sid".jsonl 2>/dev/null | head -1)
+  [ -n "$tp" ] || tp=$(ls -t "$HOME"/.claude/projects/*/"$sid".jsonl 2>/dev/null | head -1)
   [ -n "$tp" ] || return 1
   nohup "$HOME/.claude/hooks/task-summary-worker.sh" "$sid" "$tp" >/dev/null 2>&1 &
   return 0
+}
+
+# Reprint ONLY the footer line in place (no glow, no full redraw). Safe to call
+# any time after the first render has set $footer_row/$gen_epoch.
+repaint_footer() {
+  [ -n "$gen_epoch" ] || return 0
+  tput cup "$footer_row" 0 2>/dev/null; footer; tput el 2>/dev/null
+  last_rtail="$rtail"
 }
 
 # Print the footer line (no leading newline) from $AGE, $sk, $more, $rtail.
@@ -112,10 +120,22 @@ footer() {
 
 printf '\033]0;brief %s\007' "${sid:0:8}"    # name the pane
 cols=""; rows=""
-# Manual-refresh state. $rtail is the dim segment appended to the footer: a
-# standing "r → refresh" hint, or a transient "⟳ refreshing…" / "✓ no change".
-HINT=' · r → refresh'; rtail="$HINT"; last_rtail=""
+tp=$(ls -t "$HOME"/.claude/projects/*/"$sid".jsonl 2>/dev/null | head -1)   # transcript, cached
+# Refresh state. $rtail is the dim segment appended to the footer: the standing
+# hint (recomputed by set_hint from the auto toggle) or a transient status
+# ("⟳ refreshing…" / "✓ no change"). Auto-refresh ('a' toggles it, default OFF)
+# re-runs the summarizer every $auto_int s while ON, but only when the transcript
+# advanced since the last attempt, so an idle session costs nothing.
+auto=0; last_auto=0
+auto_int=${BRIEF_AUTO_INTERVAL:-300}; case "$auto_int" in ''|*[!0-9]*) auto_int=300 ;; esac
+[ "$auto_int" -lt 30 ] && auto_int=30          # floor: each refresh is a ~2¢ Haiku call
+if [ "$auto_int" -lt 60 ]; then auto_label="${auto_int}s"; else auto_label="$(( auto_int / 60 ))m"; fi
 refreshing=0; refresh_start=0; refresh_done0=0; rtail_until=0
+set_hint() {   # standing footer hint, reflecting the auto toggle
+  if [ "$auto" = 1 ]; then HINT=" · auto ${auto_label} · a off"
+  else                     HINT=' · r refresh · a auto'; fi
+}
+set_hint; rtail="$HINT"; last_rtail=""
 while :; do
   redraw=0
   # Poll the LIVE pane size every tick. stty does a direct TIOCGWINSZ ioctl, so
@@ -171,9 +191,20 @@ while :; do
     { tput clear 2>/dev/null || printf '\033[H\033[2J'; }
     printf 'No brief yet for %s.\nIt appears after the next completed turn.' "${sid:0:8}"
   fi
+  # Auto-refresh: while ON, re-run the summarizer every $auto_int seconds — but
+  # only if the transcript advanced since the last attempt (fork-free -nt test),
+  # so an idle session never spends. last_auto advances even when we skip, so we
+  # re-check at most once per interval.
+  if [ "$auto" = 1 ] && [ "$refreshing" = 0 ] && [ "$(( EPOCHSECONDS - last_auto ))" -ge "$auto_int" ]; then
+    last_auto=$EPOCHSECONDS
+    if [ -n "$tp" ] && [[ "$tp" -nt "$donef" ]]; then
+      refresh_done0=$(stat -f %m "$donef" 2>/dev/null || echo 0)
+      if do_refresh; then refreshing=1; refresh_start=$EPOCHSECONDS; rtail=' · ⟳ auto…'; repaint_footer; fi
+    fi
+  fi
   # Idle pacing AND input in one wait: up to 0.5s for a keypress (the poll
-  # interval) — 'r' forces a refresh now, 'q' closes the dock. Fractional -t
-  # needs bash 4+, already required here ($EPOCHSECONDS is bash 5+).
+  # interval) — 'r' refreshes now, 'a' toggles auto-refresh, 'q' closes the dock.
+  # Fractional -t needs bash 4+, already required here ($EPOCHSECONDS is bash 5+).
   read -rsn1 -t 0.5 key || key=""
   case "$key" in
     r|R)
@@ -184,11 +215,16 @@ while :; do
         else
           rtail=' · ⚠ no transcript'; rtail_until=$(( EPOCHSECONDS + 4 ))
         fi
-        # paint the indicator now, don't wait for the next age tick
-        if [ -n "$gen_epoch" ]; then
-          tput cup "$footer_row" 0 2>/dev/null; footer; tput el 2>/dev/null; last_rtail="$rtail"
-        fi
+        repaint_footer   # paint the indicator now, don't wait for the next age tick
       fi
+      ;;
+    a|A)
+      if [ "$auto" = 1 ]; then
+        auto=0; set_hint; rtail=' · auto off'; rtail_until=$(( EPOCHSECONDS + 4 ))
+      else
+        auto=1; last_auto=0; set_hint; rtail="$HINT"   # last_auto=0 => evaluate next tick
+      fi
+      repaint_footer
       ;;
     q|Q) exit 0 ;;
   esac
