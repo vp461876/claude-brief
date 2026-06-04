@@ -203,8 +203,9 @@ while :; do
   [ "$r" -gt 0 ] 2>/dev/null || r=$(tput lines 2>/dev/null || echo 40)
   if [ "$c" != "$cols" ] || [ "$r" != "$rows" ]; then cols="$c"; rows="$r"; redraw=1; fi
   if [ -f "$brief" ]; then
-    [[ "$brief" -nt "$marker" ]] && redraw=1   # fork-free change detection (replaces stat)
-    [[ "$skipf" -nt "$marker" ]] && redraw=1   # also repaint when the skip counter changes
+    [[ "$brief" -nt "$marker" ]] && redraw=1   # brief CONTENT changed -> full re-render (fork-free -nt)
+    # NOTE: a .skipped change is handled as a footer-only reprint below — it must
+    # NOT force a full md re-render (that caused a spurious second redraw per turn).
     if [ "$redraw" = 1 ]; then
       # Full wipe, then render CLIPPED to the pane height: keeps the TOP (title/
       # state) visible and stops content scrolling off the top of the alt screen
@@ -246,6 +247,11 @@ while :; do
         refreshing=0; spinframe=""; rtail=' · ⚠ no response'; rtail_until=$(( EPOCHSECONDS + MSG_SECS ))   # worker never reported back
       elif [ "$rtail_until" -gt 0 ] && [ "$EPOCHSECONDS" -ge "$rtail_until" ]; then
         rtail="$HINT"; rtail_until=0                 # transient message expired -> back to hint
+      fi
+      if [[ "$skipf" -nt "$marker" ]]; then          # skip count is a FOOTER field -> reprint footer, NOT a full md re-render
+        sk=$(cat "$skipf" 2>/dev/null); case "$sk" in ''|*[!0-9]*) sk=0 ;; esac
+        : > "$marker"                                # mark skipf seen (fork-free) so it won't re-fire
+        repaint_footer
       fi
       if [ "$AGE" != "$last_age" ] || [ "$rtail" != "$last_rtail" ] || [ "$spinframe" != "$last_spin" ]; then
         repaint_footer; last_age="$AGE"   # repaint_footer also sets last_rtail/last_spin
