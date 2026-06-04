@@ -121,19 +121,33 @@ footer() {
 printf '\033]0;brief %s\007' "${sid:0:8}"    # name the pane
 cols=""; rows=""
 tp=$(ls -t "$HOME"/.claude/projects/*/"$sid".jsonl 2>/dev/null | head -1)   # transcript, cached
-# Refresh state. $rtail is the dim segment appended to the footer: the standing
-# hint (recomputed by set_hint from the auto toggle) or a transient status
-# ("⟳ refreshing…" / "✓ no change"). Auto-refresh ('a' toggles it, default OFF)
-# re-runs the summarizer every $auto_int s while ON, but only when the transcript
-# advanced since the last attempt, so an idle session costs nothing.
+manualf="$state_dir/$sid.brief.manual"   # present => per-turn (Stop-hook) refresh is paused
+manual=0; [ -f "$manualf" ] && manual=1  # persists across viewer relaunches (a file the hook reads)
+# Refresh state. $rtail is the dim footer segment: the standing hint (set_hint,
+# reflecting the toggles) or a transient status ("⟳ refreshing…" / "✓ no change").
+# Keys: r refresh now · a toggle auto-refresh · +/- change the auto interval ·
+# p toggle per-turn (Stop-hook) refresh -> on-demand only · ? help · q quit.
+# Auto-refresh (default OFF) re-runs the summarizer every $auto_int s while ON,
+# but only when the transcript advanced since the last attempt -> idle = no spend.
 auto=0; last_auto=0
+fmt_int() { local s=$1   # seconds -> 30s / 5m / 1h
+  if   [ "$s" -lt 60 ];   then printf '%ss' "$s"
+  elif [ "$s" -lt 3600 ]; then printf '%dm' "$(( s / 60 ))"
+  else                         printf '%dh' "$(( s / 3600 ))"; fi
+}
+LADDER=(30 60 120 300 600 1200 1800 3600)      # +/- step through these intervals
 auto_int=${BRIEF_AUTO_INTERVAL:-300}; case "$auto_int" in ''|*[!0-9]*) auto_int=300 ;; esac
-[ "$auto_int" -lt 30 ] && auto_int=30          # floor: each refresh is a ~2¢ Haiku call
-if [ "$auto_int" -lt 60 ]; then auto_label="${auto_int}s"; else auto_label="$(( auto_int / 60 ))m"; fi
+auto_idx=3; best=2147483647                     # snap the configured interval to the nearest step
+for i in "${!LADDER[@]}"; do
+  v=${LADDER[i]}; d=$(( v > auto_int ? v - auto_int : auto_int - v ))
+  [ "$d" -lt "$best" ] && { best=$d; auto_idx=$i; }
+done
+auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int")
 refreshing=0; refresh_start=0; refresh_done0=0; rtail_until=0
-set_hint() {   # standing footer hint, reflecting the auto toggle
-  if [ "$auto" = 1 ]; then HINT=" · auto ${auto_label} · a off"
-  else                     HINT=' · r refresh · a auto'; fi
+set_hint() {   # standing footer hint, reflecting the toggles (⏸ = per-turn paused)
+  local pre=""; [ "$manual" = 1 ] && pre="⏸ "
+  if [ "$auto" = 1 ]; then HINT=" · ${pre}auto ${auto_label} · a off"
+  else                     HINT=" · ${pre}r refresh · a auto"; fi
 }
 set_hint; rtail="$HINT"; last_rtail=""
 while :; do
@@ -203,7 +217,7 @@ while :; do
     fi
   fi
   # Idle pacing AND input in one wait: up to 0.5s for a keypress (the poll
-  # interval) — 'r' refreshes now, 'a' toggles auto-refresh, 'q' closes the dock.
+  # interval). r refresh · a auto · +/- interval · p per-turn · ? help · q quit.
   # Fractional -t needs bash 4+, already required here ($EPOCHSECONDS is bash 5+).
   read -rsn1 -t 0.5 key || key=""
   case "$key" in
@@ -225,6 +239,29 @@ while :; do
         auto=1; last_auto=0; set_hint; rtail="$HINT"   # last_auto=0 => evaluate next tick
       fi
       repaint_footer
+      ;;
+    '+'|'=')   # raise the auto interval ('=' is the unshifted '+' key)
+      [ "$auto_idx" -lt $(( ${#LADDER[@]} - 1 )) ] && auto_idx=$(( auto_idx + 1 ))
+      auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int"); set_hint
+      rtail=" · auto ${auto_label}"; [ "$auto" = 0 ] && rtail="${rtail} (off)"
+      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
+    '-'|'_')   # lower the auto interval
+      [ "$auto_idx" -gt 0 ] && auto_idx=$(( auto_idx - 1 ))
+      auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int"); set_hint
+      rtail=" · auto ${auto_label}"; [ "$auto" = 0 ] && rtail="${rtail} (off)"
+      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
+    p|P)       # toggle per-turn (Stop-hook) refresh; paused => brief updates on demand only
+      if [ "$manual" = 1 ]; then
+        manual=0; rm -f "$manualf"; rtail=' · per-turn refresh on'
+      else
+        manual=1; : > "$manualf"; rtail=' · on-demand only'
+      fi
+      set_hint; rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
+    '?')       # transient key cheatsheet
+      rtail=' · r:now a:auto ±:rate p:on-demand q:quit'; rtail_until=$(( EPOCHSECONDS + 6 )); repaint_footer
       ;;
     q|Q) exit 0 ;;
   esac
