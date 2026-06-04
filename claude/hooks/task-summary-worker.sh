@@ -21,6 +21,18 @@ umask 077   # briefs/labels can contain sensitive session content -> create them
 
 state_dir="$HOME/.claude/state"
 mkdir -p "$state_dir"
+
+# Coalesce concurrent runs: a manual/interval dock refresh can race the end-of-turn
+# auto one (separate processes), each a ~2c Haiku call + a redraw. Take a per-session
+# lock (mkdir is atomic); if another summariser for this sid is already running, skip.
+# Reclaim a stale lock — a run can't outlive the 90s watchdog, so >3min => it crashed.
+lock="$state_dir/$sid.brief.lock"
+if ! mkdir "$lock" 2>/dev/null; then
+  [ -n "$(find "$lock" -maxdepth 0 -mmin +3 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
+  mkdir "$lock" 2>/dev/null || exit 0
+fi
+trap 'rmdir "$lock" 2>/dev/null' EXIT
+
 out="$state_dir/$sid.task"
 brief_out="$state_dir/$sid.brief.md"
 done_stamp="$state_dir/$sid.brief.done"   # outcome word written here at the end of EVERY attempt (updated/unchanged/timeout/error); the dock watches it
