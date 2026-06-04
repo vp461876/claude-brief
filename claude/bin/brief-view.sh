@@ -175,6 +175,10 @@ step_interval() {
   rtail_until=$(( EPOCHSECONDS + MSG_SECS )); repaint_footer
 }
 set_hint; rtail="$HINT"; last_rtail=""
+# Timing below uses $EPOCHSECONDS (the reason for the bash-5 requirement), NOT
+# $(date +%s): it's a dynamic var returning time(0) in-process (vDSO/commpage
+# read, no kernel trap, no fork) — `date` would fork+exec every 0.5s tick. Don't
+# "simplify" it to `date`.
 while :; do
   redraw=0
   # Poll the LIVE pane size every tick. stty does a direct TIOCGWINSZ ioctl, so
