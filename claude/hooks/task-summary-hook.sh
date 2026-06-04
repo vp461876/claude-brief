@@ -13,10 +13,10 @@ tpath=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 [ -z "$sid" ] && exit 0
 umask 077   # state files can summarize sensitive session content -> keep them private
 
-# Per-turn refresh can be paused from the dock (its 'p' key writes this flag), so
-# the brief updates ONLY on demand. The dock's own r/auto refresh call the worker
-# directly, bypassing this hook, so they keep working while this is set.
-[ -f "$HOME/.claude/state/$sid.brief.manual" ] && exit 0
+# End-of-turn auto refresh can be turned off from the dock (its 'a' key writes
+# this flag), so the brief then updates ONLY on demand. The dock's own r/interval
+# refresh call the worker directly, bypassing this hook, so they keep working.
+[ -f "$HOME/.claude/state/$sid.brief.noauto" ] && exit 0
 
 # Opportunistic state prune, at most once/day, detached so it adds no latency.
 prunestamp="$HOME/.claude/state/.prune-stamp"

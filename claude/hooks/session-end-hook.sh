@@ -28,5 +28,5 @@ OSA
 fi
 
 rm -f "$st/$sid.brief.session" "$st/$sid.brief.pid" "$st/$sid.brief.seen" \
-      "$st/$sid.brief.done" "$st/$sid.brief.manual"
+      "$st/$sid.brief.done" "$st/$sid.brief.noauto"
 exit 0

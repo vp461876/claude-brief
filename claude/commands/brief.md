@@ -5,12 +5,12 @@ allowed-tools: Bash(~/.claude/bin/brief-open.sh:*)
 ---
 This session's running brief (state · what's been tried · gotchas · decisions ·
 next) is shown in a docked iTerm2 pane — a side-by-side split, opened or
-re-focused just now. It refreshes itself after every completed turn. Click the
-dock pane to use its keys: `r` refresh now · `a` toggle auto-refresh (only fires
-when there's new activity, so an idle session never spends) · `+`/`-` change the
-auto interval (30s–1h) · `p` toggle the per-turn refresh so the brief updates
-**on demand only** (a `⏸` shows in the footer) · `?` key help · `q` close.
-`/brief refresh` does a one-shot refresh from here but re-splits the pane.
+re-focused just now. Click the dock pane to use its keys: `r` refresh now ·
+`a` toggle **auto** (refresh at the end of each turn — the default; turn off for
+on-demand only) · `i` toggle **interval** (refresh periodically during a long
+turn; only fires on new activity, so idle never spends) · `+`/`-` set the
+interval period (30s–1h) · `?` key help · `q` close. The footer shows both
+modes. `/brief refresh` does a one-shot refresh from here but re-splits the pane.
 
 !`~/.claude/bin/brief-open.sh $ARGUMENTS`
 

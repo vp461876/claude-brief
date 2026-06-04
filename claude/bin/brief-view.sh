@@ -121,33 +121,37 @@ footer() {
 printf '\033]0;brief %s\007' "${sid:0:8}"    # name the pane
 cols=""; rows=""
 tp=$(ls -t "$HOME"/.claude/projects/*/"$sid".jsonl 2>/dev/null | head -1)   # transcript, cached
-manualf="$state_dir/$sid.brief.manual"   # present => per-turn (Stop-hook) refresh is paused
-manual=0; [ -f "$manualf" ] && manual=1  # persists across viewer relaunches (a file the hook reads)
-# Refresh state. $rtail is the dim footer segment: the standing hint (set_hint,
-# reflecting the toggles) or a transient status ("⟳ refreshing…" / "✓ no change").
-# Keys: r refresh now · a toggle auto-refresh · +/- change the auto interval ·
-# p toggle per-turn (Stop-hook) refresh -> on-demand only · ? help · q quit.
-# Auto-refresh (default OFF) re-runs the summarizer every $auto_int s while ON,
-# but only when the transcript advanced since the last attempt -> idle = no spend.
-auto=0; last_auto=0
+# Two independent refresh modes, shown in the footer and toggled by keys:
+#   auto     — refresh at the END OF EACH TURN (the Stop hook's default). Toggling
+#              it OFF (key 'a') drops a <sid>.brief.noauto flag the Stop hook
+#              honors, so the brief then updates ON DEMAND only. Persisted (file).
+#   interval — refresh PERIODICALLY DURING a long turn (key 'i', default OFF; +/-
+#              set the period). Fires only when the transcript advanced since the
+#              last attempt, so an idle session never spends. In-memory.
+# $rtail is the dim footer segment: the standing hint (set_hint) or a transient
+# status ("⟳ refreshing…" / "✓ no change").
+noautof="$state_dir/$sid.brief.noauto"
+auto=1; [ -f "$noautof" ] && auto=0      # end-of-turn refresh; default ON, OFF persisted by the flag
+intv=0; last_intv=0                       # periodic during-turn refresh; default OFF
 fmt_int() { local s=$1   # seconds -> 30s / 5m / 1h
   if   [ "$s" -lt 60 ];   then printf '%ss' "$s"
   elif [ "$s" -lt 3600 ]; then printf '%dm' "$(( s / 60 ))"
   else                         printf '%dh' "$(( s / 3600 ))"; fi
 }
-LADDER=(30 60 120 300 600 1200 1800 3600)      # +/- step through these intervals
-auto_int=${BRIEF_AUTO_INTERVAL:-300}; case "$auto_int" in ''|*[!0-9]*) auto_int=300 ;; esac
-auto_idx=3; best=2147483647                     # snap the configured interval to the nearest step
+LADDER=(30 60 120 300 600 1200 1800 3600)      # +/- step the interval through these
+intv_int=${BRIEF_INTERVAL:-300}; case "$intv_int" in ''|*[!0-9]*) intv_int=300 ;; esac
+intv_idx=3; best=2147483647                     # snap the configured interval to the nearest step
 for i in "${!LADDER[@]}"; do
-  v=${LADDER[i]}; d=$(( v > auto_int ? v - auto_int : auto_int - v ))
-  [ "$d" -lt "$best" ] && { best=$d; auto_idx=$i; }
+  v=${LADDER[i]}; d=$(( v > intv_int ? v - intv_int : intv_int - v ))
+  [ "$d" -lt "$best" ] && { best=$d; intv_idx=$i; }
 done
-auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int")
+intv_int=${LADDER[intv_idx]}; intv_label=$(fmt_int "$intv_int")
 refreshing=0; refresh_start=0; refresh_done0=0; rtail_until=0
-set_hint() {   # standing footer hint, reflecting the toggles (⏸ = per-turn paused)
-  local pre=""; [ "$manual" = 1 ] && pre="⏸ "
-  if [ "$auto" = 1 ]; then HINT=" · ${pre}auto ${auto_label} · a off"
-  else                     HINT=" · ${pre}r refresh · a auto"; fi
+set_hint() {   # standing footer hint, reflecting both modes
+  local as='auto off' is='interval off'
+  [ "$auto" = 1 ] && as='auto on'
+  [ "$intv" = 1 ] && is="interval ${intv_label}"
+  HINT=" · ${as} · ${is} · ?"
 }
 set_hint; rtail="$HINT"; last_rtail=""
 while :; do
@@ -177,12 +181,12 @@ while :; do
       gen_epoch=$(stat -f %m "$brief" 2>/dev/null); [ -n "$gen_epoch" ] || gen_epoch=$EPOCHSECONDS
       footer_row=$(( (total < maxrows ? total : maxrows) + 1 ))   # content rows + the blank line
       agebucket $(( EPOCHSECONDS - gen_epoch )); last_age="$AGE"
-      refreshing=0; rtail="$HINT"; rtail_until=0   # fresh content shown => any manual refresh is done
+      refreshing=0; rtail="$HINT"; rtail_until=0   # fresh content shown => any in-flight refresh is done
       printf '\n'; footer; last_rtail="$rtail"
       : > "$marker"                            # mark "rendered as of now" (builtin, no fork)
     elif [ -n "$gen_epoch" ]; then
-      # No content change. Tick the relative age, reconcile manual-refresh state,
-      # and reprint ONLY the footer line when something there changed. No glow.
+      # No content change. Tick the relative age, reconcile in-flight refresh
+      # state, and reprint ONLY the footer line when something changed. No glow.
       agebucket $(( EPOCHSECONDS - gen_epoch ))
       if [ "$refreshing" = 1 ]; then
         # An UNCHANGED refresh writes no brief, so watch the done-stamp to learn
@@ -205,19 +209,19 @@ while :; do
     { tput clear 2>/dev/null || printf '\033[H\033[2J'; }
     printf 'No brief yet for %s.\nIt appears after the next completed turn.' "${sid:0:8}"
   fi
-  # Auto-refresh: while ON, re-run the summarizer every $auto_int seconds — but
-  # only if the transcript advanced since the last attempt (fork-free -nt test),
-  # so an idle session never spends. last_auto advances even when we skip, so we
-  # re-check at most once per interval.
-  if [ "$auto" = 1 ] && [ "$refreshing" = 0 ] && [ "$(( EPOCHSECONDS - last_auto ))" -ge "$auto_int" ]; then
-    last_auto=$EPOCHSECONDS
+  # Interval refresh: while ON, re-run the summarizer every $intv_int seconds —
+  # but only if the transcript advanced since the last attempt (fork-free -nt
+  # test), so an idle session never spends. last_intv advances even when we skip,
+  # so we re-check at most once per interval.
+  if [ "$intv" = 1 ] && [ "$refreshing" = 0 ] && [ "$(( EPOCHSECONDS - last_intv ))" -ge "$intv_int" ]; then
+    last_intv=$EPOCHSECONDS
     if [ -n "$tp" ] && [[ "$tp" -nt "$donef" ]]; then
       refresh_done0=$(stat -f %m "$donef" 2>/dev/null || echo 0)
-      if do_refresh; then refreshing=1; refresh_start=$EPOCHSECONDS; rtail=' · ⟳ auto…'; repaint_footer; fi
+      if do_refresh; then refreshing=1; refresh_start=$EPOCHSECONDS; rtail=' · ⟳ interval…'; repaint_footer; fi
     fi
   fi
   # Idle pacing AND input in one wait: up to 0.5s for a keypress (the poll
-  # interval). r refresh · a auto · +/- interval · p per-turn · ? help · q quit.
+  # interval). r refresh · a auto · i interval · +/- period · ? help · q quit.
   # Fractional -t needs bash 4+, already required here ($EPOCHSECONDS is bash 5+).
   read -rsn1 -t 0.5 key || key=""
   case "$key" in
@@ -232,36 +236,36 @@ while :; do
         repaint_footer   # paint the indicator now, don't wait for the next age tick
       fi
       ;;
-    a|A)
+    a|A)       # toggle auto = refresh at the end of each turn (persisted via the noauto flag)
       if [ "$auto" = 1 ]; then
-        auto=0; set_hint; rtail=' · auto off'; rtail_until=$(( EPOCHSECONDS + 4 ))
+        auto=0; : > "$noautof"; rtail=' · auto off — on-demand only'
       else
-        auto=1; last_auto=0; set_hint; rtail="$HINT"   # last_auto=0 => evaluate next tick
-      fi
-      repaint_footer
-      ;;
-    '+'|'=')   # raise the auto interval ('=' is the unshifted '+' key)
-      [ "$auto_idx" -lt $(( ${#LADDER[@]} - 1 )) ] && auto_idx=$(( auto_idx + 1 ))
-      auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int"); set_hint
-      rtail=" · auto ${auto_label}"; [ "$auto" = 0 ] && rtail="${rtail} (off)"
-      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
-      ;;
-    '-'|'_')   # lower the auto interval
-      [ "$auto_idx" -gt 0 ] && auto_idx=$(( auto_idx - 1 ))
-      auto_int=${LADDER[auto_idx]}; auto_label=$(fmt_int "$auto_int"); set_hint
-      rtail=" · auto ${auto_label}"; [ "$auto" = 0 ] && rtail="${rtail} (off)"
-      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
-      ;;
-    p|P)       # toggle per-turn (Stop-hook) refresh; paused => brief updates on demand only
-      if [ "$manual" = 1 ]; then
-        manual=0; rm -f "$manualf"; rtail=' · per-turn refresh on'
-      else
-        manual=1; : > "$manualf"; rtail=' · on-demand only'
+        auto=1; rm -f "$noautof"; rtail=' · auto on — refresh each turn'
       fi
       set_hint; rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
       ;;
+    i|I)       # toggle interval = refresh periodically during a long turn
+      if [ "$intv" = 1 ]; then
+        intv=0; rtail=' · interval off'
+      else
+        intv=1; last_intv=0; rtail=" · interval ${intv_label}"   # last_intv=0 => evaluate next tick
+      fi
+      set_hint; rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
+    '+'|'=')   # raise the interval period ('=' is the unshifted '+' key)
+      [ "$intv_idx" -lt $(( ${#LADDER[@]} - 1 )) ] && intv_idx=$(( intv_idx + 1 ))
+      intv_int=${LADDER[intv_idx]}; intv_label=$(fmt_int "$intv_int"); set_hint
+      rtail=" · interval ${intv_label}"; [ "$intv" = 0 ] && rtail="${rtail} (off)"
+      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
+    '-'|'_')   # lower the interval period
+      [ "$intv_idx" -gt 0 ] && intv_idx=$(( intv_idx - 1 ))
+      intv_int=${LADDER[intv_idx]}; intv_label=$(fmt_int "$intv_int"); set_hint
+      rtail=" · interval ${intv_label}"; [ "$intv" = 0 ] && rtail="${rtail} (off)"
+      rtail_until=$(( EPOCHSECONDS + 4 )); repaint_footer
+      ;;
     '?')       # transient key cheatsheet
-      rtail=' · r:now a:auto ±:rate p:on-demand q:quit'; rtail_until=$(( EPOCHSECONDS + 6 )); repaint_footer
+      rtail=' · r refresh · a auto · i interval · ± period · q quit'; rtail_until=$(( EPOCHSECONDS + 6 )); repaint_footer
       ;;
     q|Q) exit 0 ;;
   esac
