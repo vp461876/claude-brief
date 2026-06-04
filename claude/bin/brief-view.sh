@@ -169,7 +169,7 @@ for i in "${!LADDER[@]}"; do
 done
 intv_int=${LADDER[intv_idx]}; intv_label=$(fmt_int "$intv_int")
 refreshing=0; refresh_start=0; rtail_until=0
-SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏); spin=0; spinframe=""; last_spin=""   # in-flight spinner: leads the footer, animated while refreshing
+SPIN=('|' '/' '-' '\'); spin=0; spinframe=""; last_spin=""   # in-flight spinner (rotating bar): leads the footer, animated while refreshing
 done_mt=$(stat -f %m "$donef" 2>/dev/null || echo 0)   # last-seen done-stamp mtime (outcome watcher)
 REFRESH_TIMEOUT=95   # viewer backstop for a stuck refresh (the worker's own 90s watchdog + margin)
 MSG_SECS=4           # how long a transient footer message lingers before reverting to the hint
