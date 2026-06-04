@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 # Detached worker. Summarizes the session into ~/.claude/state/<sid>.task as:
 #   ▸ goal: <overarching objective>   (free, from Claude Code's auto title)
-#   ▸ now:  <most recent sub-task>     (Haiku-summarized)
+#   ▸ now:  <most recent sub-task>     (model-summarized)
 # and maintains a richer living brief in ~/.claude/state/<sid>.brief.md
-# (State / Tried / Gotchas / Decisions / Next) produced by the SAME Haiku call,
+# (State / Tried / Gotchas / Decisions / Next) from the same summariser call,
 # so tabbing back into a session can re-brief you on demand (see /brief).
 #
 # Triggered by the Stop hook (once per completed agent turn) and on demand by the
 # /brief dock (its 'r' key and interval refresh call this directly), so the labels
-# are fresh whenever you tab back to this terminal. Uses `claude -p` with Haiku to
-# reuse existing Claude auth (OAuth; no API keys to manage), run as lean as
-# possible to minimize cost:
-#   - MCP disabled + built-in tools disabled -> ~9k fewer prefix tokens
-#   - fixed neutral working dir (no CLAUDE.md) -> byte-stable prefix, so the
-#     5-min prompt cache is reused across turns and across projects
+# are fresh whenever you tab back to this terminal.
+#
+# The MODEL CALL is PLUGGABLE: this worker builds the system+user prompts, then
+# delegates to $BRIEF_SUMMARIZER (default ~/.claude/bin/brief-summarize.sh, a lean
+# Haiku `claude -p`) under a ${BRIEF_SUMMARY_TIMEOUT:-90}s watchdog, and parses
+# the response. Swap in another model/backend by pointing $BRIEF_SUMMARIZER at
+# your own script (contract documented in brief-summarize.sh).
 sid="$1"; tpath="$2"
 [ -z "$sid" ] && exit 0
 umask 077   # briefs/labels can contain sensitive session content -> create them private
 
 state_dir="$HOME/.claude/state"
-sumcwd="$state_dir/.sumcwd"   # neutral, CLAUDE.md-free dir => stable cache key
-mkdir -p "$state_dir" "$sumcwd"
+mkdir -p "$state_dir"
 out="$state_dir/$sid.task"
 brief_out="$state_dir/$sid.brief.md"
 done_stamp="$state_dir/$sid.brief.done"   # outcome word written here at the end of EVERY attempt (updated/unchanged/timeout/error); the dock watches it
@@ -53,9 +53,6 @@ if [ -f "$tpath" ]; then
 fi
 hist=$(printf '%s' "$hist" | tail -c 5000)
 
-# Built-in tools we strip from the request (we never use them for summarizing).
-NOTOOLS='Bash,Read,Edit,Write,Glob,Grep,Task,WebFetch,WebSearch,TodoWrite,NotebookEdit,BashOutput,KillShell,ExitPlanMode,SlashCommand'
-
 sys='You maintain the live state of a coding session. Output TWO parts.
 
 PART 1 — a 2-line status label. Output EXACTLY two lines, lowercase keys, no markdown, no quotes, no trailing punctuation:
@@ -87,18 +84,28 @@ $prompt
 
 Produce PART 1, then the ===BRIEF=== marker line, then PART 2."
 
-# 90s watchdog via perl (already a dependency; macOS built-in) instead of GNU
-# `timeout` (coreutils, not on a stock macOS): the alarm survives exec, and
-# SIGALRM's default action kills the claude call if it hangs.
-res=$( cd "$sumcwd" 2>/dev/null && CLAUDE_TASK_SUMMARY=1 \
-        MAX_THINKING_TOKENS=0 DISABLE_INTERLEAVED_THINKING=1 \
-        perl -e 'alarm shift @ARGV; exec @ARGV' 90 claude -p "$usr" \
-        --append-system-prompt "$sys" \
-        --model "${ANTHROPIC_DEFAULT_HAIKU_MODEL:-claude-haiku-4-5}" \
-        --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-        --disallowedTools "$NOTOOLS" \
-        </dev/null 2>/dev/null )
-rc=$?   # 0 ok · 124/142 = watchdog timeout · other non-zero = comms/CLI failure
+# Resolve the summariser. $BRIEF_SUMMARIZER swaps the model, but it's EXECUTED,
+# so only honour it if it's an ABSOLUTE path to a regular, user-owned, non-world-
+# writable executable — else fall back to the shipped default. It runs as you
+# (like $EDITOR); this guards against an override you didn't set yourself — e.g. a
+# relative path resolved in an untrusted repo's CWD, or a world-writable/other-
+# owned script. (A user-owned script *inside* an untrusted repo still passes;
+# restrict the path further or rely on project-trust if that matters to you.)
+summariser="$HOME/.claude/bin/brief-summarize.sh"
+if [ -n "$BRIEF_SUMMARIZER" ]; then
+  perm=$(stat -f %Lp "$BRIEF_SUMMARIZER" 2>/dev/null || echo 777)
+  case "$BRIEF_SUMMARIZER" in
+    /*) [ -f "$BRIEF_SUMMARIZER" ] && [ -x "$BRIEF_SUMMARIZER" ] && [ -O "$BRIEF_SUMMARIZER" ] \
+          && ! (( 8#$perm & 0002 )) && summariser="$BRIEF_SUMMARIZER" ;;
+  esac
+fi
+# Prompts go via env ($BRIEF_SYS/$BRIEF_USR); CLAUDE_TASK_SUMMARY guards recursion
+# if the summariser calls claude. Bound it with a perl watchdog (perl is a dep +
+# macOS built-in; the alarm survives exec, SIGALRM kills a hung call).
+res=$( BRIEF_SYS="$sys" BRIEF_USR="$usr" CLAUDE_TASK_SUMMARY=1 \
+        perl -e 'alarm shift @ARGV; exec @ARGV' "${BRIEF_SUMMARY_TIMEOUT:-90}" "$summariser" \
+        2>/dev/null )
+rc=$?   # 0 ok · 124/142 = watchdog timeout · other non-zero = summariser failure
 
 # Split the response into the 2-line label and the brief (after the marker).
 case "$res" in

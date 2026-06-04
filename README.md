@@ -10,7 +10,10 @@ iTerm2 — so you can tab between many concurrent sessions and instantly re-orie
 
 ## How it works
 - A **`Stop`** hook runs a cheap Haiku summary each completed turn (cost-gated:
-  skips trivial turns) → `~/.claude/state/<sid>.brief.md` + `.task`.
+  skips trivial turns) → `~/.claude/state/<sid>.brief.md` + `.task`. The model
+  call is **pluggable** — `task-summary-worker.sh` delegates to
+  `bin/brief-summarize.sh` (default Haiku `claude -p`); point `$BRIEF_SUMMARIZER`
+  at your own script (contract documented in that file) to use another model.
 - A **`UserPromptSubmit`** hook maps pane/cwd → session id so `/brief` resolves
   which session it's in.
 - The viewer renders the brief with `glow` + a perl post-processor (gutter, indent
@@ -21,7 +24,7 @@ iTerm2 — so you can tab between many concurrent sessions and instantly re-orie
 ## Files (mirror of the live `~/.claude` layout)
 ```
 claude/hooks/      task-prompt-hook.sh task-summary-hook.sh task-summary-worker.sh session-end-hook.sh
-claude/bin/        brief-open.sh brief-view.sh brief-prune.sh
+claude/bin/        brief-open.sh brief-view.sh brief-prune.sh brief-summarize.sh
 claude/commands/   brief.md
 claude/glow-brief.json
 iterm2/DynamicProfiles/brief.json      (Default profile + 1.2x line spacing)
