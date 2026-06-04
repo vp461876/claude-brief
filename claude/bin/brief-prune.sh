@@ -24,4 +24,12 @@ done
 # Orphaned pane->sid and cwd->sid map entries older than the threshold.
 find "$st/panes" "$st/cwds" -type f -mtime +"$days" -delete 2>/dev/null
 
+# The summariser's inner `claude -p` leaves a throwaway transcript per call in the
+# neutral sumcwd project dir. They're never reused (each summary is independent),
+# so keep only ~2 days (enough to inspect a recent bad summary) regardless of the
+# session-state $days — else they grow unbounded. Dir name = the sumcwd path with
+# '/' and '.' turned into '-' (Claude's project-dir munge).
+sumproj="$HOME/.claude/projects/$(printf '%s' "$HOME/.claude/state/.sumcwd" | tr '/.' '-')"
+[ -d "$sumproj" ] && find "$sumproj" -type f -mtime +1 -delete 2>/dev/null
+
 exit 0
