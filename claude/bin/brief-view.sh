@@ -225,6 +225,7 @@ while :; do
       footer_row=$(( (total < maxrows ? total : maxrows) + 1 ))   # content rows + the blank line
       agebucket $(( EPOCHSECONDS - gen_epoch )); last_age="$AGE"
       refreshing=0; spinframe=""; rtail="$HINT"; rtail_until=0   # fresh content shown => any in-flight refresh is done
+      last_intv=$EPOCHSECONDS   # a refresh just landed -> reset interval timer so it can't re-fire right on top (the double redraw)
       printf '\n'; footer; last_rtail="$rtail"; last_spin="$spinframe"
       : > "$marker"                            # mark "rendered as of now" (builtin, no fork)
     elif [ -n "$gen_epoch" ]; then
@@ -239,7 +240,7 @@ while :; do
       # only worth announcing when WE asked for the refresh.
       dm=$(stat -f %m "$donef" 2>/dev/null || echo 0)
       if [ "$dm" != "$done_mt" ]; then
-        done_mt=$dm; was_ours=$refreshing; refreshing=0; spinframe=""
+        done_mt=$dm; was_ours=$refreshing; refreshing=0; spinframe=""; last_intv=$EPOCHSECONDS   # any completed refresh (incl. UNCHANGED) resets the interval timer
         case "$(cat "$donef" 2>/dev/null)" in
           timeout)   rtail=' · ⚠ summary timed out'; rtail_until=$(( EPOCHSECONDS + MSG_SECS )) ;;
           error)     rtail=' · ⚠ summary failed';    rtail_until=$(( EPOCHSECONDS + MSG_SECS )) ;;
