@@ -23,12 +23,14 @@ check_deps() {
     missing=1
   fi
 
-  # bash >= 4 — the viewer uses $EPOCHSECONDS and fractional `read -t` (bash 5);
-  # macOS ships 3.2, so a newer bash must be on PATH (scripts use env bash).
-  if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then
+  # bash >= 5 — the viewer uses $EPOCHSECONDS (bash 5.0) for its timers; macOS
+  # ships 3.2, so a newer bash must be on PATH (scripts use env bash). (The hooks
+  # alone are 3.2-safe, so brief generation works without this — only the dock
+  # viewer needs bash 5.)
+  if [ "${BASH_VERSINFO[0]:-0}" -ge 5 ]; then
     printf '  \xe2\x9c\x93 %-10s %s\n' bash "$BASH_VERSION"
   else
-    printf '  \xe2\x9c\x97 %-10s %s — need >= 4: brew install bash\n' bash "${BASH_VERSION:-unknown}"
+    printf '  \xe2\x9c\x97 %-10s %s — need >= 5 for the dock viewer: brew install bash\n' bash "${BASH_VERSION:-unknown}"
     missing=1
   fi
 

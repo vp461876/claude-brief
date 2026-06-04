@@ -42,7 +42,8 @@ iterm2/DynamicProfiles/brief.json      (Default profile + 1.2x line spacing)
   ```
 
 ## Requirements
-macOS · iTerm2 3.6+ · bash ≥ 4 (`brew install bash`) · `jq` · `perl` (built-in;
+macOS · iTerm2 3.6+ · bash ≥ 5 for the dock viewer (`brew install bash`; the
+hooks alone are 3.2-safe) · `jq` · `perl` (built-in;
 also the summarizer's 90s watchdog, so no coreutils needed) · the `claude` CLI ·
 `osascript` (built-in). Optional: `glow` (`brew install glow`, recommended) or
 `bat` for nicer rendering. `./install.sh --check` verifies all of these.
