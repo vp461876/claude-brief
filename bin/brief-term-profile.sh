@@ -30,6 +30,9 @@ fi
 src=$(osascript -e 'tell application "Terminal" to return name of current settings of front window' 2>/dev/null)
 [ -n "$src" ] || src=$(defaults read com.apple.Terminal "Default Window Settings" 2>/dev/null)
 [ -n "$src" ] || { echo "brief: couldn't determine the current Terminal profile (run me from Terminal)."; exit 1; }
+# $src flows into a plutil keypath and the "Initial Settings/$src.terminal" path below —
+# reject anything that could traverse or escape the directory.
+case "$src" in *..*|*/*) echo "brief: refusing unexpected Terminal profile name '$src'."; exit 1 ;; esac
 
 stamp(){   # set name + 1.2× line spacing on $out
   plutil -convert xml1 "$out" >/dev/null 2>&1

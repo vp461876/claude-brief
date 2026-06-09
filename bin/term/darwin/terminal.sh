@@ -32,6 +32,8 @@ tdrv_open(){
   _mode=$1; shift 2; _cmd="$*"
   _pos=1; [ "$_mode" = float ] && _pos=0
   _prof="${BRIEF_PROFILE:-brief}"
+  _cmd=$(printf '%s' "$_cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')      # escape for the AppleScript string literals
+  _prof=$(printf '%s' "$_prof" | sed 's/\\/\\\\/g; s/"/\\"/g')
   _err="${TMPDIR:-/tmp}/brief-term.$$"
   _id=$(osascript 2>"$_err" <<OSA
 tell application "Terminal"

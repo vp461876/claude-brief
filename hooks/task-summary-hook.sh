@@ -14,6 +14,7 @@ input=$(cat)
 sid=$(printf '%s' "$input" | jq -r '.session_id // empty')
 tpath=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 [ -z "$sid" ] && exit 0
+case "$sid" in *[!0-9a-fA-F-]*) exit 0 ;; esac   # UUID-shaped only: $sid is used in state file paths
 umask 077   # state files can summarize sensitive session content -> keep them private
 
 # End-of-turn auto refresh can be turned off from the dock (its 'a' key writes

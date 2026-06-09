@@ -32,16 +32,25 @@ model=${BRIEF_API_MODEL:-${ANTHROPIC_DEFAULT_HAIKU_MODEL:-claude-haiku-4-5}}
 token=${BRIEF_API_TOKEN:-$ANTHROPIC_AUTH_TOKEN}
 [ -n "$token" ] || { echo "brief-summarize-api: no token — set BRIEF_API_TOKEN or ANTHROPIC_AUTH_TOKEN (or put it in ~/.claude/brief-summarizer.env)" >&2; exit 1; }
 
-# Build the request body with jq so the prompts are safely JSON-escaped.
+# Build the request body with jq so the prompts are safely JSON-escaped. Write it to a
+# PRIVATE temp file (umask 077) and POST with -d @file, so the conversation text never
+# lands on curl's argv (visible in `ps`).
+umask 077
 body=$(jq -n --arg m "$model" --arg s "$BRIEF_SYS" --arg u "$BRIEF_USR" \
   '{model:$m, max_tokens:2000, system:$s, messages:[{role:"user", content:$u}]}') || exit 1
+bodyf=$(mktemp "${TMPDIR:-/tmp}/brief-body.XXXXXX") || exit 1
+trap 'rm -f "$bodyf"' EXIT
+printf '%s' "$body" > "$bodyf"
 
-resp=$(curl -sS --max-time "${BRIEF_SUMMARY_TIMEOUT:-90}" \
-  -H "authorization: Bearer $token" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -d "$body" \
-  "${base%/}/v1/messages") || exit 1
+# Auth header via a stdin curl-config (-K -), NOT -H on the command line, so the bearer
+# token never appears in the process table. printf is a shell builtin, so the token isn't
+# on any forked process's argv either.
+resp=$(printf 'header = "authorization: Bearer %s"\n' "$token" \
+  | curl -sS --max-time "${BRIEF_SUMMARY_TIMEOUT:-90}" -K - \
+      -H "anthropic-version: 2023-06-01" \
+      -H "content-type: application/json" \
+      -d @"$bodyf" \
+      "${base%/}/v1/messages") || exit 1
 
 # Anthropic Messages response: { content: [ {type:"text", text:"…"}, … ], … }.
 # On an error response there's no .content[].text, so $text is empty -> exit 1.

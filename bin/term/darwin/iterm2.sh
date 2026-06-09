@@ -22,6 +22,8 @@ tdrv_self_pane(){ printf '%s' "${ITERM_SESSION_ID#*:}" | tr -dc '0-9A-Fa-f-'; }
 tdrv_open(){
   _mode=$1 _anchor=$2; shift 2; _cmd="$*"
   _prof="${BRIEF_PROFILE:-brief}"
+  _cmd=$(printf '%s' "$_cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')      # escape for the AppleScript string literals
+  _prof=$(printf '%s' "$_prof" | sed 's/\\/\\\\/g; s/"/\\"/g')
   osascript 2>/dev/null <<OSA
 tell application "iTerm2"
   activate

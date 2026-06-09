@@ -34,9 +34,16 @@ sumcwd="$HOME/.claude/state/.sumcwd"; mkdir -p "$sumcwd"
 cd "$sumcwd" 2>/dev/null || exit 1
 export CLAUDE_TASK_SUMMARY=1            # so the inner claude's own hooks bail (the worker sets this too)
 export MAX_THINKING_TOKENS=0 DISABLE_INTERLEAVED_THINKING=1
-exec claude -p "$BRIEF_USR" \
+# Feed the prompt via stdin (an immediately-unlinked private temp file), not as a
+# `claude -p <prompt>` argv, so the recent-conversation text isn't exposed in `ps`. The fd
+# stays open after the unlink, so the data is on no on-disk path either. `exec` is kept so
+# the worker's watchdog (SIGALRM) still kills claude directly if it hangs.
+pf=$(mktemp "${TMPDIR:-/tmp}/brief-prompt.XXXXXX") || exit 1
+printf '%s' "$BRIEF_USR" > "$pf"
+exec 3<"$pf"; rm -f "$pf"
+exec claude -p \
   --append-system-prompt "$BRIEF_SYS" \
   --model "${ANTHROPIC_DEFAULT_HAIKU_MODEL:-claude-haiku-4-5}" \
   --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
   --disallowedTools "$NOTOOLS" \
-  </dev/null
+  <&3

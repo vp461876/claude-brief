@@ -59,6 +59,7 @@ tdrv_open(){
   case "$_anchor" in *[!0-9A-Fa-f-]*) _anchor="" ;; esac   # UUID-shaped anchor only
   # Inject the caller's PATH so the viewer's `env bash` resolves bash 5, not 3.2.
   _path=$(printf '%s' "$PATH" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  _cmd=$(printf '%s' "$_cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')      # escape for the AppleScript string literal (defense-in-depth)
   _err="${TMPDIR:-/tmp}/brief-ghostty.$$"
   _tid=$(osascript 2>"$_err" <<OSA
 tell application "Ghostty"

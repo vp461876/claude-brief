@@ -18,6 +18,7 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/.." && pwd)"   # plugin roo
 # your own script (contract documented in brief-summarize.sh).
 sid="$1"; tpath="$2"
 [ -z "$sid" ] && exit 0
+case "$sid" in *[!0-9a-fA-F-]*) exit 0 ;; esac   # UUID-shaped only: $sid is used in mkdir/rm/file paths
 command -v jq >/dev/null 2>&1 || exit 0   # no jq: can't parse the transcript (the SessionStart hook tells the user)
 umask 077   # briefs/labels can contain sensitive session content -> create them private
 . "$ROOT/bin/lib/portable.sh"   # _mtime/_perm (portable BSD/GNU stat)
@@ -142,7 +143,7 @@ if [ -n "$BRIEF_SUMMARIZER" ]; then
     *..*) ;;                                            # reject path-traversal escapes
     "$HOME"/.claude/*|"$ROOT"/*)                         # trusted: ~/.claude or the installed plugin root
       [ -f "$BRIEF_SUMMARIZER" ] && [ -x "$BRIEF_SUMMARIZER" ] && [ -O "$BRIEF_SUMMARIZER" ] \
-        && ! (( 8#$perm & 0002 )) && summariser="$BRIEF_SUMMARIZER" ;;
+        && ! (( 8#$perm & 0022 )) && summariser="$BRIEF_SUMMARIZER" ;;   # reject group/other-writable (matches the api-config check)
   esac
 fi
 # Prompts go via env ($BRIEF_SYS/$BRIEF_USR); CLAUDE_TASK_SUMMARY guards recursion

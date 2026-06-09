@@ -11,6 +11,7 @@ command -v jq >/dev/null 2>&1 || exit 0   # no jq: can't parse the transcript (t
 
 input=$(cat)
 sid=$(printf '%s' "$input" | jq -r '.session_id // empty')
+case "$sid" in ''|*[!0-9a-fA-F-]*) exit 0 ;; esac   # UUID-shaped only: $sid is used in state file paths
 prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
 tpath=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 [ -z "$sid" ] && exit 0
