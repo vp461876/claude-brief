@@ -70,6 +70,8 @@ Architecture, the driver contract, adding a terminal → **[DEVELOPING.md](DEVEL
 
 ## Commands
 
+Open and manage the dock with slash commands:
+
 | Command | What it does |
 |---|---|
 | `/claude-brief:brief` | Open or refocus the docked split with this session's live brief (State · Tried · Gotchas · Decisions · Next) |
@@ -77,8 +79,16 @@ Architecture, the driver contract, adding a terminal → **[DEVELOPING.md](DEVEL
 | `/claude-brief:brief refresh` | Regenerate the brief now, instead of waiting for the next turn |
 | `/claude-brief:brief close` | Tear the dock down — a clean, no-prompt close on every backend |
 
-In the dock: `r` refresh now · `a` toggle end-of-turn auto-refresh · `i` toggle periodic
-refresh · `+`/`-` interval · `?` keys · `q` close.
+Once it's open, **the in-dock keys are what you'll use most** — click the pane, then press:
+
+| Key | What it does |
+|---|---|
+| `r` | Refresh the brief now |
+| `a` | Toggle auto-refresh at the end of each turn (on by default) |
+| `i` | Toggle periodic refresh during a long turn (fires only on new activity, so idle never costs) |
+| `+` / `-` | Adjust the refresh interval (30s–1h) |
+| `?` | Show the key help |
+| `q` | Close the dock |
 
 ## How it works
 A **`Stop`** hook runs a cheap Haiku summary each completed turn (cost-gated: it
