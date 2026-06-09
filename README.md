@@ -91,6 +91,7 @@ few KB). Tool calls and their outputs are **stripped**, so raw file contents /
 command output are not sent (though the assistant's prose may quote paths, code, or
 errors). It goes to the same gateway Claude Code already uses — or wherever you point
 `$BRIEF_SUMMARIZER` (see [Customizing the summary model](#customizing-the-summary-model)).
+Full [privacy policy](PRIVACY.md) — local storage, retention, and what the maintainer can (and can't) see.
 
 ## Terminals
 Auto-detected; force one with `BRIEF_TERMINAL=<name>`. Most need no setup — a few do:
