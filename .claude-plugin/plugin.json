@@ -8,5 +8,17 @@
   },
   "homepage": "https://github.com/tigerquoll/claude-brief",
   "repository": "https://github.com/tigerquoll/claude-brief",
-  "license": "BSD-3-Clause"
+  "license": "BSD-3-Clause",
+  "keywords": [
+    "session-summary",
+    "brief",
+    "dock",
+    "hooks",
+    "multi-session",
+    "context-switching",
+    "productivity",
+    "terminal",
+    "session-management",
+    "status-line"
+  ]
 }
