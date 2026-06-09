@@ -17,7 +17,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: ShellCheck
         run: |
@@ -48,7 +48,7 @@ jobs:
     # ~/.claude from the repo (no install needed); the real-terminal e2e blocks skip under CI.
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install bash 5 + jq
         run: |
