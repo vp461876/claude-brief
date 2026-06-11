@@ -102,8 +102,10 @@ conversation title, the previous brief, your latest prompt, and the recent
 conversation (the last ~14 user/assistant message **text** blocks, truncated to a
 few KB). Tool calls and their outputs are **stripped**, so raw file contents /
 command output are not sent (though the assistant's prose may quote paths, code, or
-errors). It goes to the same gateway Claude Code already uses — or wherever you point
-`$BRIEF_SUMMARIZER` (see [Customizing the summary model](#customizing-the-summary-model)).
+errors). It goes to the same service Claude Code already uses — via the `claude` CLI on
+subscription auth, or straight to your configured `ANTHROPIC_BASE_URL` endpoint on
+API-billed sessions — or wherever you point `$BRIEF_SUMMARIZER`
+(see [Customizing the summary model](#customizing-the-summary-model)).
 Full [privacy policy](PRIVACY.md) — local storage, retention, and what the maintainer can (and can't) see.
 
 ## Terminals
@@ -236,7 +238,7 @@ this project's choices — a *structured, model-written brief*, *cost-gated*, in
 
 | Project | What it surfaces | Where it renders | Per-turn model brief | Terminal scope |
 |---|---|---|---|---|
-| **claude-brief** (this) | Structured brief — State · Tried · Gotchas · Decisions · Next | **Docked pane** beside the session | ✅ Haiku, cost-gated; pluggable + API-direct path | iTerm2 · tmux · kitty · WezTerm · ghostty · Apple Terminal (+ generic) |
+| **claude-brief** (this) | Structured brief — State · Tried · Gotchas · Decisions · Next | **Docked pane** beside the session | ✅ Haiku, cost-gated; pluggable, auto-uses a ~4× cheaper API-direct path on API-billed sessions | iTerm2 · tmux · kitty · WezTerm · ghostty · Apple Terminal (+ generic) |
 | [Quickchat AI — tmux summaries][pa-quickchat] | 2–3 sentence summary | tmux **status bar** (2-line) | ✅ Haiku via `claude -p`, no gating | tmux only |
 | [tmux-agent-sidebar][pa-sidebar] | Raw activity: prompts, tool calls, wait reason, subagent tree, git/worktrees | Docked **tmux sidebar** | ❌ monitor only | tmux 3.0+ |
 | [tmux-agent-status][pa-status] | Working / idle / done / parked + fzf jumper | tmux sidebar + status line | ❌ | tmux |
