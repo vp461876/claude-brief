@@ -90,6 +90,8 @@ public GitHub issue**. It collects by *allowlist* — only facts that cannot lea
   principle echo conversation fragments.
 - One probe summary call with a **fixed, generic prompt** (so its output and stderr
   contain nothing of yours); the stderr shown is scrubbed of key-shaped strings.
+- One anonymous version-freshness request to the **GitHub releases API** — the same
+  request as visiting the repo's releases page; it carries no session data.
 - No window or tab titles, no pane contents, no transcript text. Paths render with
   `$HOME` as `~`; session ids are truncated.
 

@@ -137,6 +137,16 @@ if [ "$mode" = debug ]; then
   [ -f "$ROOT/.claude-plugin/plugin.json" ] && command -v jq >/dev/null 2>&1 \
     && pv=$(jq -r '.version // "unset"' "$ROOT/.claude-plugin/plugin.json" 2>/dev/null)
   echo "plugin version:   $pv"
+  # Anonymous freshness check against the GitHub releases API (fail-soft, 5s
+  # cap) so stale-version bug reports identify themselves. Carries no session
+  # data — it's the same request as visiting the repo's releases page.
+  latest=$(curl -fsSL -m 5 https://api.github.com/repos/tigerquoll/claude-brief/releases/latest 2>/dev/null \
+           | jq -r '.tag_name // empty' 2>/dev/null); latest=${latest#v}
+  case "$latest" in
+    '')    echo "latest release:   unknown (offline or rate-limited)" ;;
+    "$pv") echo "latest release:   $latest (up to date)" ;;
+    *)     echo "latest release:   $latest (installed: $pv — update via /plugin update, then /reload-plugins)" ;;
+  esac
   if [ "$inst" = plugin ] && [ -f "$HOME/.claude/hooks/task-summary-hook.sh" ]; then
     echo "WARNING:          a manual ~/.claude install is ALSO present — hooks may double-fire"
   fi

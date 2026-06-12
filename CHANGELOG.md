@@ -11,6 +11,13 @@ that version into the tarball's `plugin.json` and commits the bump to `main` —
 bump commit always lands one commit *after* the tag. The dates below are the release
 dates.
 
+## Unreleased
+
+### Added
+- `latest release:` line in the debug `[install]` section — an anonymous,
+  fail-soft (5s) check against the GitHub releases API, so stale-version bug
+  reports identify themselves. Disclosed in PRIVACY.md.
+
 ## [1.5.0] — 2026-06-12
 
 ### Added

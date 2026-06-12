@@ -479,6 +479,13 @@ echo "config warn: sk-ant-SUPERSECRET99 Bearer hunter2-token" >&2
 echo OK
 DBGSTUB
 chmod +x "$DBGDIR/claude"
+# curl stub: serves the version-freshness check (the only network call in debug),
+# keeping the suite offline and asserting the update-available rendering.
+cat > "$DBGDIR/curl" <<'VERSTUB'
+#!/usr/bin/env bash
+printf '{"tag_name":"v9.9.9"}'
+VERSTUB
+chmod +x "$DBGDIR/curl"
 # the fake terminal driver (the TERMINAL DRIVER section below re-creates it minus
 # the preflight — this block runs first, and only debug calls tdrv_preflight)
 mkdir -p "$BIN/term/common"
@@ -511,6 +518,7 @@ is "dock: last error shown"      "$(printf '%s\n' "$dbg" | grep -c 'last dock er
 is "dock: last error scrubbed"   "$(printf '%s\n' "$dbg" | grep -c 'LEAKME99')" 0
 is "dock: login-shell bash line" "$(printf '%s\n' "$dbg" | grep -c '^login-shell bash:')" 1
 is "session: last failure class" "$(printf '%s\n' "$dbg" | grep -c 'last failure:.*timeout (rc=124')" 1
+is "install: latest-release line" "$(printf '%s\n' "$dbg" | grep -c 'latest release:   9.9.9')" 1
 rm -f "$ST/.brief-dock-err"
 rm -rf "$DBGDIR"; rm -f "$ST/panes/FP"; wipe
 
