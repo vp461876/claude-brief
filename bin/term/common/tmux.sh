@@ -47,6 +47,13 @@ tdrv_open(){
   fi
 }
 
+# Optional `/brief debug` preflight: short ASCII lines; non-zero = dock can't work.
+tdrv_preflight(){
+  echo "version: $(tmux -V 2>/dev/null || echo 'tmux not on PATH')"
+  if tmux display-message -p ok >/dev/null 2>&1; then echo "server: responding"
+  else echo "server: NOT responding (stale \$TMUX? server killed?)"; return 1; fi
+}
+
 # kill-pane is clean: it removes the pane (and its window if it was the last pane),
 # terminating the viewer regardless of its signal traps — no husk, no confirm
 # prompt (the easy case next to ghostty/Apple Terminal). The id is %N-shaped only.

@@ -73,3 +73,10 @@ tdrv_close(){
   case "$_id" in *[!0-9]*) return 0 ;; esac   # integer id only
   wezterm cli kill-pane --pane-id "$_id" 2>/dev/null || true
 }
+
+# Optional `/brief debug` preflight: short ASCII lines; non-zero = dock can't work.
+tdrv_preflight(){
+  echo "version: $(wezterm --version 2>/dev/null | head -1 || echo 'wezterm not on PATH')"
+  if wezterm cli list >/dev/null 2>&1; then echo "wezterm cli: ok"
+  else echo "wezterm cli: FAILED - the GUI mux server is not reachable"; return 1; fi
+}

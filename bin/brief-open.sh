@@ -174,6 +174,37 @@ if [ "$mode" = debug ]; then
   w="$state_dir/.brief-summarizer-warn"
   echo "warn:             $([ -f "$w" ] && scrub "$(cat "$w")" || echo none)"
   echo
+  echo "[dock]"
+  echo "driver:           $(tdrv_name)   override: ${BRIEF_TERMINAL:-none}"
+  sig=""
+  [ -n "${TMUX:-}" ]             && sig="${sig}TMUX "
+  [ -n "${TERM_PROGRAM:-}" ]     && sig="${sig}TERM_PROGRAM=${TERM_PROGRAM} "
+  [ -n "${KITTY_WINDOW_ID:-}" ]  && sig="${sig}KITTY_WINDOW_ID "
+  [ -n "${WEZTERM_PANE:-}" ]     && sig="${sig}WEZTERM_PANE "
+  [ -n "${ITERM_SESSION_ID:-}" ] && sig="${sig}ITERM_SESSION_ID "
+  [ -n "${TERM_SESSION_ID:-}" ]  && sig="${sig}TERM_SESSION_ID "
+  echo "signals:          ${sig:-none}"
+  echo "self pane:        $([ -n "$pane" ] && echo "resolved ($(printf '%s' "$pane" | cut -c1-12))" || echo "EMPTY - split anchoring and pane->sid mapping unavailable")"
+  sf="$state_dir/$sid.brief.session"
+  if [ -n "$sid" ] && [ -f "$sf" ]; then
+    sold=$(cat "$sf"); sdrv=${sold%% *}; spid=${sold#* }   # MIRROR of the reload parse above
+    [ "$sdrv" = "$spid" ] && sdrv=iterm2                   # legacy single-token => iterm2
+    mm=""; [ "$sdrv" != "$(tdrv_name)" ] && mm="  MISMATCH vs detected driver"
+    echo "dock session:     driver=$sdrv pane=$(printf '%s' "$spid" | cut -c1-12)$mm"
+  else
+    echo "dock session:     none recorded"
+  fi
+  if type tdrv_preflight >/dev/null 2>&1; then
+    # The osascript-based preflights can pop the one-time Automation approval.
+    tdrv_preflight 2>&1 | head -6 | while IFS= read -r l; do
+      printf 'preflight:        %s\n' "$(scrub "$l")"
+    done
+  else
+    echo "preflight:        none for this backend"
+  fi
+  de="$state_dir/.brief-dock-err"
+  echo "last dock error:  $([ -f "$de" ] && scrub "$(cat "$de")" || echo none)"
+  echo
   echo "[summariser]"
   bs="${BRIEF_SUMMARIZER-}"
   verdict="honoured"
@@ -278,7 +309,23 @@ if [ "$mode" = close ]; then
   exit 0
 fi
 
-new_id=$(tdrv_open "$mode" "$pane" "$ROOT/bin/brief-view.sh" "$sid")
+# Capture the driver's stderr so a failed open leaves evidence: drivers explain
+# themselves there (osascript errors, `kitty @` refusals, setup hints), and that
+# was previously discarded. It still flows through to OUR stderr (the hints are
+# user-facing); on failure it's also persisted to .brief-dock-err for /brief
+# debug, and any earlier error is cleared on success.
+dock_errf="$state_dir/.brief-dock-err"
+derr=$(mktemp "${TMPDIR:-/tmp}/brief-dock.XXXXXX")
+new_id=$(tdrv_open "$mode" "$pane" "$ROOT/bin/brief-view.sh" "$sid" 2>"$derr"); open_rc=$?
+cat "$derr" >&2
+if [ -n "$new_id" ]; then
+  rm -f "$dock_errf"
+elif [ "$(tdrv_name)" != generic ] && [ "$(tdrv_name)" != tabby ]; then   # those two can't auto-dock by design
+  { printf '%s %s (rc=%s): ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(tdrv_name)" "$open_rc"
+    if [ -s "$derr" ]; then tr '\n' ' ' < "$derr" | cut -c1-300; else printf 'no stderr from the driver'; fi
+    echo; } > "$dock_errf"
+fi
+rm -f "$derr"
 
 if [ -n "$new_id" ]; then
   printf '%s %s\n' "$(tdrv_name)" "$new_id" > "$sess_file"

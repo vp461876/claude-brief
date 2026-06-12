@@ -22,6 +22,14 @@ dates.
   masked. When an auto-selected API probe fails, the CLI fallback is probed too —
   mirroring the worker — so a failing-but-recovering setup reads as exactly that.
   Safe to paste into a public GitHub issue.
+- `[dock]` section in the debug report: detection signals (presence only), the
+  detected driver vs any override, self-pane resolution, the dock session's
+  driver vs the currently-detected one (mismatch flagged), a per-backend
+  `tdrv_preflight` probe (tmux server ping, `kitty @ ls` over the socket,
+  `wezterm cli`, osascript Automation checks with TCC `-1743` called out — new
+  OPTIONAL driver-contract hook, see DEVELOPING.md), and the **last dock error**:
+  a failed `tdrv_open`'s stderr is now persisted to `state/.brief-dock-err`
+  (cleared on the next successful open) instead of being discarded.
 
 ### Fixed
 - The API summariser now reports the error response's `type`/`message` fields on

@@ -468,19 +468,21 @@ echo "config warn: sk-ant-SUPERSECRET99 Bearer hunter2-token" >&2
 echo OK
 DBGSTUB
 chmod +x "$DBGDIR/claude"
-# the fake terminal driver (the TERMINAL DRIVER section below re-creates it with
-# the same content — this block just runs first)
+# the fake terminal driver (the TERMINAL DRIVER section below re-creates it minus
+# the preflight — this block runs first, and only debug calls tdrv_preflight)
 mkdir -p "$BIN/term/common"
-printf '%s' $'tdrv_name(){ printf fake; }\ntdrv_self_pane(){ printf FP; }\ntdrv_open(){ echo "open $*" >>/tmp/t-term; printf FAKEID; }\ntdrv_close(){ echo "close $*" >>/tmp/t-term; }\n' > "$BIN/term/common/fake.sh"
+printf '%s' $'tdrv_name(){ printf fake; }\ntdrv_self_pane(){ printf FP; }\ntdrv_open(){ echo "open $*" >>/tmp/t-term; printf FAKEID; }\ntdrv_close(){ echo "close $*" >>/tmp/t-term; }\ntdrv_preflight(){ echo "fake preflight ok"; }\n' > "$BIN/term/common/fake.sh"
 wipe; mkdir -p "$ST/panes"; printf '%s\n' "$S" > "$ST/panes/FP"
 printf 'error\n' > "$ST/$S.brief.done"; printf '3 %s\n' "$(date +%s)" > "$ST/$S.brief.fail"
+printf 'tmux %%1\n' > "$ST/$S.brief.session"                      # opened by ANOTHER driver -> mismatch
+printf '2026-01-01T00:00:00Z fake (rc=1): boom sk-ant-LEAKME99\n' > "$ST/.brief-dock-err"
 dbg=$(
   unset BRIEF_SUMMARIZER BRIEF_AUTO_API ANTHROPIC_AUTH_TOKEN BRIEF_API_TOKEN BRIEF_API_BASE
   export ANTHROPIC_API_KEY="t0p-secret-value-do-not-leak"
   BRIEF_TERMINAL=fake PATH="$DBGDIR:$PATH" "$BIN/brief-open.sh" debug 2>&1
 ); dbgrc=$?
 is "debug exits 0"               "$dbgrc" 0
-for sect in install session summariser probe; do
+for sect in install session dock summariser probe; do
   is "debug has [$sect]"         "$(printf '%s\n' "$dbg" | grep -c "^\[$sect\]")" 1
 done
 is "debug shows key shape only"  "$(printf '%s\n' "$dbg" | grep -c 'ANTHROPIC_API_KEY: *set(len')" 1
@@ -491,7 +493,22 @@ is "debug truncates sid"         "$(printf '%s\n' "$dbg" | grep -c "$S")" 0
 is "debug probe ran (rc=0, out)" "$(printf '%s\n' "$dbg" | grep -c 'rc=0 .*output: yes')" 1
 is "debug scrubs sk-ant key"     "$(printf '%s\n' "$dbg" | grep -c 'SUPERSECRET99')" 0
 is "debug scrubs bearer token"   "$(printf '%s\n' "$dbg" | grep -c 'hunter2')" 0
+is "dock: preflight ran"         "$(printf '%s\n' "$dbg" | grep -c 'fake preflight ok')" 1
+is "dock: driver mismatch flag"  "$(printf '%s\n' "$dbg" | grep -c 'MISMATCH vs detected')" 1
+is "dock: last error shown"      "$(printf '%s\n' "$dbg" | grep -c 'last dock error:.*boom')" 1
+is "dock: last error scrubbed"   "$(printf '%s\n' "$dbg" | grep -c 'LEAKME99')" 0
+rm -f "$ST/.brief-dock-err"
 rm -rf "$DBGDIR"; rm -f "$ST/panes/FP"; wipe
+
+echo "BRIEF-OPEN — failed dock open persists .brief-dock-err; success clears it"
+printf '%s' $'tdrv_name(){ printf fakebad; }\ntdrv_self_pane(){ printf FP; }\ntdrv_open(){ echo "split refused" >&2; return 1; }\ntdrv_close(){ :; }\n' > "$BIN/term/common/fakebad.sh"
+wipe; rm -f "$ST/.brief-dock-err"; mkdir -p "$ST/panes"; printf '%s\n' "$S" > "$ST/panes/FP"
+BRIEF_TERMINAL=fakebad "$BIN/brief-open.sh" >/dev/null 2>&1
+is "failed open exits non-zero"  "$?" 1
+is "dock error persisted"        "$(grep -c 'fakebad (rc=1): split refused' "$ST/.brief-dock-err" 2>/dev/null)" 1
+BRIEF_TERMINAL=fake "$BIN/brief-open.sh" >/dev/null 2>&1
+is "successful open clears it"   "$([ -f "$ST/.brief-dock-err" ] && echo kept || echo gone)" gone
+rm -f "$BIN/term/common/fakebad.sh" "$ST/panes/FP"; wipe
 
 echo "VIEWER MATH — fmt_int / agebucket / interval ladder (MIRROR of brief-view.sh)"
 fmt_int(){ local s=$1; if [ "$s" -lt 60 ];then printf '%ss' "$s";elif [ "$s" -lt 3600 ];then printf '%dm' "$((s/60))";else printf '%dh' "$((s/3600))";fi; }

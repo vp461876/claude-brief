@@ -59,3 +59,11 @@ tdrv_close(){
   case "$_id" in *[!0-9]*) return 0 ;; esac   # integer id only
   _kitty_at close-window --match "id:$_id" 2>/dev/null || true
 }
+
+# Optional `/brief debug` preflight: short ASCII lines; non-zero = dock can't work.
+tdrv_preflight(){
+  if [ -n "${KITTY_LISTEN_ON:-}" ]; then echo "KITTY_LISTEN_ON: present"
+  else echo "KITTY_LISTEN_ON: ABSENT - add 'allow_remote_control yes' + 'listen_on unix:/tmp/kitty' to kitty.conf, then RESTART kitty"; fi
+  if _kitty_at ls >/dev/null 2>&1; then echo "kitty @ ls: ok"
+  else echo "kitty @ ls: FAILED - socket remote control unreachable (tty transport does not work from /brief's tty-less context)"; return 1; fi
+}

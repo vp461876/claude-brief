@@ -138,3 +138,18 @@ tell application "Terminal"
 end tell
 OSA
 }
+
+# Optional `/brief debug` preflight: short ASCII lines; non-zero = dock can't work.
+# The probe itself can trigger the one-time macOS Automation approval dialog.
+tdrv_preflight(){
+  _o=$(perl -e 'alarm shift @ARGV; exec @ARGV' 8 osascript -e 'tell application "Terminal" to version' 2>&1)
+  _rc=$?
+  if [ "$_rc" = 0 ]; then echo "automation: ok (Terminal $_o)"
+  else
+    case "$_o" in
+      *-1743*) echo "automation: DENIED (TCC -1743) - allow your terminal under System Settings > Privacy & Security > Automation" ;;
+      *)       echo "automation: FAILED rc=$_rc ($(printf '%s' "$_o" | tr '\n' ' ' | cut -c1-120))" ;;
+    esac
+    return 1
+  fi
+}

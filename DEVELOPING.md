@@ -100,6 +100,10 @@ and MAY define:
 ```sh
 tdrv_rank                  # detection precedence 0-99 (default 50); a multiplexer
                            #   (tmux) returns a higher rank so the inner mux wins
+tdrv_preflight             # `/brief debug` diagnostics: print 1-6 short ASCII lines
+                           #   (reachability, permissions, versions — no window/tab
+                           #   titles, no env values); return non-zero if the dock
+                           #   cannot work. Undefined => "none for this backend".
 ```
 
 `generic` is the fallback: it defines no `tdrv_detect`, and its `tdrv_open` is a
