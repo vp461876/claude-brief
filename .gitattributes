@@ -7,6 +7,7 @@ docs/           export-ignore
 traffic/        export-ignore
 DEVELOPING.md   export-ignore
 README.md       export-ignore
+CHANGELOG.md    export-ignore
 test.sh         export-ignore
 .shellcheckrc   export-ignore
 .gitattributes  export-ignore
