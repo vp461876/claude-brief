@@ -11,6 +11,17 @@ that version into the tarball's `plugin.json` and commits the bump to `main` —
 bump commit always lands one commit *after* the tag. The dates below are the release
 dates.
 
+## [1.6.1] — 2026-06-15
+
+### Fixed
+- Summariser no longer emits a "restore project context" brief instead of a
+  summary. The default CLI summariser runs `claude -p` from an empty neutral
+  working dir (`.sumcwd`), and Claude Code injects that environment (cwd, "not a
+  git repository") into the system prompt; the model could treat it as ground
+  truth, see it conflict with a transcript about a real git project, and report a
+  context mismatch. The system prompt now fences the summariser off from its own
+  runtime environment — the transcript is its sole source of truth.
+
 ## [1.6.0] — 2026-06-15
 
 ### Added
@@ -143,6 +154,7 @@ Haiku call on the `Stop` hook, docked beside the session with pluggable terminal
 backends (iTerm2, tmux, kitty, WezTerm, ghostty, Apple Terminal, generic fallback),
 manual `~/.claude` install via `install.sh`, and release tarballs.
 
+[1.6.1]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.6.1
 [1.6.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.6.0
 [1.5.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.5.0
 [1.4.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.4.0
