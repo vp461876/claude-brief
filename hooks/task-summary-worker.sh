@@ -102,7 +102,7 @@ else                           budget_note="This is a ROOMY pane (~${avail} disp
 fi
 
 # shellcheck disable=SC2016  # literal prompt text; $-sequences are intentional, not expansions
-sys='You maintain the live state of a coding session. Output TWO parts.
+sys='You maintain the live state of a coding session by summarising the transcript in the user message — that transcript is your ONLY source of truth about the session. You are an OBSERVER describing the work, not a participant doing it: ignore your own runtime environment (your working directory, whether it is a git repository, what files or tools are available) — it is NOT the session being summarised. Never report a context or directory mismatch, ask where the project is, or request files, paths, or access; only describe what the transcript shows. Output TWO parts.
 
 PART 1 — a 2-line status label. Output EXACTLY two lines, lowercase keys, no markdown, no quotes, no trailing punctuation:
 goal: <overarching objective of the session, <=9 words>

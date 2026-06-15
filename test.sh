@@ -80,11 +80,20 @@ wipe; printf '3 %s\n' "$(($(date +%s)-700))" > "$ST/$S.brief.fail"; rm -f /tmp/t
       is "reset on success"        "$([ -f "$ST/$S.brief.fail" ] && echo kept || echo reset)" reset
 
 echo "WORKER — budget tiers"
-mkfake t-echo.sh $'#!/usr/bin/env bash\nprintf "%s" "$BRIEF_USR" | head -1 > /tmp/t-usr\nprintf "goal: g\\nnow: n\\n===BRIEF===\\n# x\\n## State\\n- s\\n## Next / Open\\n- n\\n"\n'
+mkfake t-echo.sh $'#!/usr/bin/env bash\nprintf "%s" "$BRIEF_USR" | head -1 > /tmp/t-usr\nprintf "%s" "$BRIEF_SYS" > /tmp/t-sys\nprintf "goal: g\\nnow: n\\n===BRIEF===\\n# x\\n## State\\n- s\\n## Next / Open\\n- n\\n"\n'
 wipe; printf '12 60\n' > "$ST/$S.brief.size"; BRIEF_SUMMARIZER="$BIN/t-echo.sh" "$W" "$S" "$TP"
       is "small pane tier" "$(grep -o 'SMALL pane' /tmp/t-usr)" "SMALL pane"
 wipe; printf '60 120\n' > "$ST/$S.brief.size"; BRIEF_SUMMARIZER="$BIN/t-echo.sh" "$W" "$S" "$TP"
       is "roomy pane tier" "$(grep -o 'ROOMY pane' /tmp/t-usr)" "ROOMY pane"
+
+echo "WORKER — system prompt fences off the summariser's own environment"
+# The CLI summariser runs claude -p from an empty neutral cwd; Claude Code injects
+# that environment (cwd, 'not a git repository') into the system prompt. Without a
+# guardrail the model treats it as ground truth and emits a 'restore project
+# context' brief instead of a summary. Assert the guardrail is in BRIEF_SYS.
+wipe; BRIEF_SUMMARIZER="$BIN/t-echo.sh" "$W" "$S" "$TP"
+      is "sys: transcript is sole source of truth" "$(grep -c 'ONLY source of truth' /tmp/t-sys)" 1
+      is "sys: ignore own runtime environment"      "$(grep -c 'ignore your own runtime environment' /tmp/t-sys)" 1
 
 echo "WORKER — lock coalesces concurrent runs"
 wipe; rm -f /tmp/t-lc
