@@ -11,7 +11,7 @@ that version into the tarball's `plugin.json` and commits the bump to `main` —
 bump commit always lands one commit *after* the tag. The dates below are the release
 dates.
 
-## Unreleased
+## [1.6.0] — 2026-06-15
 
 ### Added
 - `latest release:` line in the debug `[install]` section — an anonymous,
@@ -143,6 +143,7 @@ Haiku call on the `Stop` hook, docked beside the session with pluggable terminal
 backends (iTerm2, tmux, kitty, WezTerm, ghostty, Apple Terminal, generic fallback),
 manual `~/.claude` install via `install.sh`, and release tarballs.
 
+[1.6.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.6.0
 [1.5.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.5.0
 [1.4.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.4.0
 [1.3.0]: https://github.com/tigerquoll/claude-brief/releases/tag/v1.3.0
